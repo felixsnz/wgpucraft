@@ -1,17 +1,29 @@
-use winit::window::Window;
+use wgpu::{BindGroup, Error};
+
+use winit::window::Window as SysWindow;
+
+use crate::world::{self, World};
+pub trait Draw {
+    fn draw<'a>(
+        &'a self, 
+        render_pass: &mut wgpu::RenderPass<'a>, 
+        uniforms: &'a wgpu::BindGroup
+    ) -> Result<(), Error>;
+}
+
 
 
 pub struct Renderer {
     surface: wgpu::Surface,
-    device: wgpu::Device,
+    pub device: wgpu::Device,
     pub size: winit::dpi::PhysicalSize<u32>,
-    config: wgpu::SurfaceConfiguration,
-    queue: wgpu::Queue
+    pub config: wgpu::SurfaceConfiguration,
+    pub queue: wgpu::Queue
 }
 
 impl Renderer {
     pub fn new(
-        window: &Window,
+        window: &SysWindow,
         runtime: &tokio::runtime::Runtime
     ) -> Self {
         let size = window.inner_size();
@@ -94,14 +106,14 @@ impl Renderer {
         //todo!();
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, world: &World, camera_bind_group: &BindGroup) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -120,8 +132,11 @@ impl Renderer {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            world.draw(&mut _render_pass, &camera_bind_group);
         }
-    
+
+        
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
