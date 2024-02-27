@@ -4,14 +4,13 @@ use winit:: {
 };
 
 use winit::{
-    event_loop::{EventLoop, EventLoopWindowTarget},
+    event_loop::EventLoop,
         window::WindowBuilder,
-        event::{WindowEvent, KeyEvent, ElementState},
-        keyboard::{PhysicalKey, KeyCode
-    }};
-
+    };
 
 use crate::engine::Engine;
+
+
 
 
 
@@ -32,7 +31,7 @@ pub fn run() {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
 
-    //let mut engine = Engine::new(window, runtime);
+    let mut engine = Engine::new(window, runtime);
     event_loop.set_control_flow(ControlFlow::Poll);
 
     event_loop.run(move | event, elwt | {
@@ -42,9 +41,9 @@ pub fn run() {
                 window_id,
                 event
             }
-            if true => {
+            if window_id == engine.window.id() => {
 
-                print!("Asd");
+                engine.handle_window_event(event, elwt)
 
             },
             

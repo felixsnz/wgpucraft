@@ -105,16 +105,16 @@ impl Engine {
 
             WindowEvent::RedrawRequested => {
                 self.renderer.update();
-                // match self.renderer.render(&self.world, &self.camera_bind_group) {
-                //     Ok(_) => {}
-                //     // Reconfigure the surface if lost
-                //     Err(wgpu::SurfaceError::Lost) => self.renderer.resize(self.renderer.size),
-                //     // The system is out of memory, we should probably quit
-                //     Err(wgpu::SurfaceError::OutOfMemory) => elwt.exit(),
-                //     // All other errors (Outdated, Timeout) should be resolved by the next frame
-                //     Err(e) => eprintln!("{:?}", e)
-                // }
-                // TODO
+                match self.renderer.render(&self.world, &self.camera_bind_group) {
+                    Ok(_) => {}
+                    // Reconfigure the surface if lost
+                    Err(wgpu::SurfaceError::Lost) => self.renderer.resize(self.renderer.size),
+                    // The system is out of memory, we should probably quit
+                    Err(wgpu::SurfaceError::OutOfMemory) => elwt.exit(),
+                    // All other errors (Outdated, Timeout) should be resolved by the next frame
+                    Err(e) => eprintln!("{:?}", e)
+                }
+                
             },
             
             _ => {}

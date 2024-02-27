@@ -133,7 +133,7 @@ impl Renderer {
                 timestamp_writes: None,
             });
 
-            world.draw(&mut _render_pass, &camera_bind_group);
+            //world.draw(&mut _render_pass, &camera_bind_group);
         }
 
         
