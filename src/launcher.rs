@@ -3,7 +3,15 @@ use winit:: {
     event_loop::ControlFlow,
 };
 
-use crate::{GameState, window::Window};
+use winit::{
+    event_loop::{EventLoop, EventLoopWindowTarget},
+        window::WindowBuilder,
+        event::{WindowEvent, KeyEvent, ElementState},
+        keyboard::{PhysicalKey, KeyCode
+    }};
+
+
+use crate::engine::Engine;
 
 
 
@@ -20,12 +28,11 @@ pub fn run() {
         .build()
         .unwrap();
 
-        let (window, event_loop)= Window::new(runtime);
+    let event_loop = EventLoop::new().unwrap();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    let mut game_state = GameState {
-        window
-    };
 
+    //let mut engine = Engine::new(window, runtime);
     event_loop.set_control_flow(ControlFlow::Poll);
 
     event_loop.run(move | event, elwt | {
@@ -35,9 +42,9 @@ pub fn run() {
                 window_id,
                 event
             }
-            if window_id == game_state.window.id() => {
+            if true => {
 
-                game_state.window.handle_window_event(event, elwt);
+                print!("Asd");
 
             },
             
