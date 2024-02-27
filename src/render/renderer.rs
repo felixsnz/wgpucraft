@@ -128,12 +128,12 @@ impl Renderer {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: None, //later modified when implement depth texture
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
 
-            //world.draw(&mut _render_pass, &camera_bind_group);
+            world.draw(&mut _render_pass, &camera_bind_group);
         }
 
         

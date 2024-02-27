@@ -30,7 +30,7 @@ pub fn constructor(
 
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Render Figure Pipeline"),
+        label: Some("Render generic Pipeline"),
         layout: Some(&layout),
         primitive: primitive,
         vertex: wgpu::VertexState {
@@ -47,13 +47,7 @@ pub fn constructor(
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: Texture::DEPTH_FORMAT,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less, // 1.
-            stencil: wgpu::StencilState::default(), // 2.
-            bias: wgpu::DepthBiasState::default(),
-        }),
+        depth_stencil: None, //change this when add depth texture
         multisample: wgpu::MultisampleState {
             count: 1,
             mask: !0,

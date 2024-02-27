@@ -16,17 +16,17 @@ pub struct World {
 }
 
 impl World {                        ///
-    pub fn new(renderer: &Renderer, uniform_bind_group_layout:&wgpu::BindGroupLayout) -> Self {
+    pub fn new(renderer: &Renderer) -> Self {
         let atlas = Atlas::new(&renderer.device, &renderer.queue).unwrap();
 
-
+        let camera_layout = CameraLayout::new(&renderer.device);
         let render_pipeline_layout = renderer.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&atlas.texture_bind_group_layout, uniform_bind_group_layout],
+            bind_group_layouts: &[&atlas.texture_bind_group_layout, &camera_layout.bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        let camera_layout = CameraLayout::new(&renderer.device);
+        
 
         let shader = renderer.device.create_shader_module(wgpu::include_wgsl!("../../assets/shaders/shader.wgsl"));
 

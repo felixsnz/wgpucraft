@@ -66,12 +66,13 @@ impl Engine {
         
         let world = World::new(
             &renderer,
-            &renderer.device.create_bind_group_layout(
-            &BindGroupLayoutDescriptor {
-                entries: &GlobalsLayouts::base_globals_layout(),
-                label: Some("Uniform layout")
-            }
-        ));
+            // &renderer.device.create_bind_group_layout(
+            // &BindGroupLayoutDescriptor {
+            //     entries: &GlobalsLayouts::base_globals_layout(),
+            //     label: Some("Uniform layout")
+            //     }
+            // )
+        );
 
         Self {
             window,
