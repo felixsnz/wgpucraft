@@ -29,6 +29,7 @@ pub fn run() {
 
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let mut last_render_time = instant::Instant::now();  // NEW!
 
 
     let mut engine = Engine::new(window, runtime);
@@ -36,12 +37,24 @@ pub fn run() {
 
     event_loop.run(move | event, elwt | {
         match event {
+
+            
+
+            Event::DeviceEvent { ref event, .. } => {
+                engine.input(event);
+            }
+            Event::AboutToWait => {
+                // RedrawRequested will only trigger once, unless we manually
+                // request it.
+                engine.window.request_redraw();
+            }
             
             Event::WindowEvent {
                 window_id,
                 event
             }
             if window_id == engine.window.id() => {
+                
 
                 engine.handle_window_event(event, elwt)
 
