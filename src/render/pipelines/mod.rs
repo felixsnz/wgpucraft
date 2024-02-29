@@ -11,7 +11,6 @@ use crate::render::texture::*;
 pub fn constructor(
     device: &wgpu::Device,
     layout: &wgpu::PipelineLayout,
-    camera_layout: &CameraLayout, //temporary until i add a way to reference global layouts
     vertex_layouts: &[wgpu::VertexBufferLayout],
     primitive_topology: wgpu::PrimitiveTopology,
     shader: wgpu::ShaderModule,

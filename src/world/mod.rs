@@ -36,7 +36,6 @@ impl World {                        ///
         let pipeline = pipeline_constructor(
             &renderer.device,
             &render_pipeline_layout,
-            &camera_layout,
             &[QuadVertex::desc()],
             wgpu::PrimitiveTopology::TriangleList,
             shader,
