@@ -2,7 +2,7 @@ use wgpu::{BindGroup, Error};
 
 use winit::window::Window as SysWindow;
 
-use crate::world::{self, World};
+use crate::world::World;
 pub trait Draw {
     fn draw<'a>(
         &'a self, 
@@ -133,7 +133,7 @@ impl Renderer {
                 timestamp_writes: None,
             });
 
-            world.draw(&mut _render_pass, &camera_bind_group);
+            world.draw(&mut _render_pass, &camera_bind_group).unwrap();
         }
 
         

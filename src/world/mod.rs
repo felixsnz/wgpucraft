@@ -3,7 +3,6 @@ use crate::{render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pip
 use self::block::{Block, QuadVertex};
 
 pub mod block;
-pub mod chunk;
 
 use wgpu::Error;
 

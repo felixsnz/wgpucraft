@@ -1,23 +1,16 @@
-use crate::render::buffer::{self, Buffer};
-use crate::render::{pipelines::GlobalsLayouts, renderer::Renderer};
-use crate::scene::camera::{Camera, CameraLayout, Projection};
-use crate::world::World;
 use instant::Instant;
 use tokio::runtime::Runtime;
-use wgpu::{BindGroup, BindGroupLayoutDescriptor};
-
-
-use winit::event::{DeviceEvent, MouseButton};
-use winit::platform::scancode::PhysicalKeyExtScancode;
-use winit::window::Window;
-
-
+use wgpu::BindGroup;
 use winit::{
-    event_loop::{EventLoop, EventLoopWindowTarget},
-        window::WindowBuilder,
-        event::{WindowEvent, KeyEvent, ElementState},
-        keyboard::{PhysicalKey, KeyCode
-    }};
+        event_loop::EventLoopWindowTarget,
+        event::{WindowEvent, DeviceEvent, KeyEvent, ElementState},
+        keyboard::{PhysicalKey, KeyCode},
+        window::Window
+    };
+
+use crate::render::renderer::Renderer;
+use crate::scene::camera::{Camera, CameraLayout};
+use crate::world::World;
 
 
 
@@ -27,7 +20,6 @@ pub struct Engine {
     camera_bind_group: BindGroup,
     world: World,
     camera:Camera,
-    mouse_pressed: bool, //temporal until i find a better place to store this state
     last_render_time: Instant 
 
 }
@@ -36,7 +28,7 @@ impl Engine {
 
     pub fn new(window: Window, runtime: Runtime) -> Self {
 
-        let mut last_render_time = instant::Instant::now();
+        let last_render_time = instant::Instant::now();
 
 
         
@@ -59,12 +51,6 @@ impl Engine {
         
         let world = World::new(
             &renderer,
-            // &renderer.device.create_bind_group_layout(
-            // &BindGroupLayoutDescriptor {
-            //     entries: &GlobalsLayouts::base_globals_layout(),
-            //     label: Some("Uniform layout")
-            //     }
-            // )
         );
 
         Self {
@@ -73,7 +59,6 @@ impl Engine {
             camera_bind_group,
             world,
             camera,
-            mouse_pressed:false,
             last_render_time
             
         }

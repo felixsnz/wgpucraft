@@ -1,5 +1,4 @@
 use cgmath::*;
-use wgpu::BindGroup;
 use winit::event::*;
 use winit::dpi::PhysicalPosition;
 use instant::Duration;
@@ -34,7 +33,7 @@ impl Uniforms {
         }
     }
 
-    pub fn update_view_proj(&mut self, position: Point3<f32>, camera_matrix: Matrix4<f32>, projection_matrix: Matrix4<f32>) {
+    pub fn update_view_proj(&mut self, /* position: Point3<f32>, */ camera_matrix: Matrix4<f32>, projection_matrix: Matrix4<f32>) {
         //self.view_position = position.to_homogeneous().into();
         self.view_proj = (projection_matrix * camera_matrix).into()
     }
@@ -162,7 +161,7 @@ impl Camera {
 
     pub fn update(&mut self, queue: &wgpu::Queue, dt: Duration) {
         self.update_camera_controller(dt);
-        self.uniforms.update_view_proj(self.position, self.calc_matrix(), self.projection.calc_matrix());
+        self.uniforms.update_view_proj(/* self.position , */ self.calc_matrix(), self.projection.calc_matrix());
         queue.write_buffer(&self.uniform_buffer.buff, 0, bytemuck::cast_slice(&[self.uniforms]));
     }
 
