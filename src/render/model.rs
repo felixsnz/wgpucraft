@@ -1,4 +1,4 @@
-use crate::world::{
+use crate::scene::world::{
     block::QuadVertex, 
 };
 

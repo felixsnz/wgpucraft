@@ -1,4 +1,4 @@
-use crate::world::{block::{Block, QuadVertex}};
+use crate::scene::world::{block::{Block, QuadVertex}};
 
 #[derive(Clone)]
 
