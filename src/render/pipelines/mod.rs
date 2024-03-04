@@ -1,4 +1,14 @@
 
+pub mod terrain;
+
+
+use std::marker::PhantomData;
+
+use wgpu::{BindGroup, BindGroupLayout};
+
+use super::texture::{self, Texture};
+
+
 
 pub fn constructor(
     device: &wgpu::Device,
@@ -49,8 +59,13 @@ pub fn constructor(
 }
 
 
+
+
+
+
 pub struct GlobalsLayouts {
     pub globals: wgpu::BindGroupLayout,
+    pub atlas_layout: wgpu::BindGroupLayout
 }
 
 impl GlobalsLayouts {
@@ -76,8 +91,55 @@ impl GlobalsLayouts {
             entries: &Self::base_globals_layout(),
         });
 
+        let atlas_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+            ],
+            label: Some("atlas_bind_group_layout"),
+        });
+
         Self {
             globals,
+            atlas_layout
         }
+    }
+
+    pub fn bind_atlas_texture(
+        &self,
+        device: &wgpu::Device,
+        layout: &BindGroupLayout,
+        texture: &Texture
+    ) -> BindGroup {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.globals,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
+                },
+            ],
+        });
+
+        bind_group
     }
 }

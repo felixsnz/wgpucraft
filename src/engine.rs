@@ -1,4 +1,4 @@
-use instant::Instant;
+
 use tokio::runtime::Runtime;
 use wgpu::BindGroup;
 use winit::{
@@ -8,19 +8,18 @@ use winit::{
         window::Window
     };
 
-use crate::render::renderer::Renderer;
-use crate::scene::camera::{Camera, CameraLayout};
-use crate::world::World;
+use crate::render::{pipelines::GlobalsLayouts, renderer::Renderer};
+use crate::scene::{camera::Camera, world::World};
 
 
 
 pub struct Engine {
     pub window: Window,
     renderer: Renderer,
-    camera_bind_group: BindGroup,
+    camera_bind_group: BindGroup, //delete this
     world: World,
     camera:Camera,
-    last_render_time: Instant 
+    
 
 }
 
@@ -28,7 +27,7 @@ impl Engine {
 
     pub fn new(window: Window, runtime: Runtime) -> Self {
 
-        let last_render_time = instant::Instant::now();
+        
 
 
         
@@ -36,10 +35,10 @@ impl Engine {
         let camera = Camera::new(&renderer, (0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
 
 
-        let camera_layout = CameraLayout::new(&renderer.device);
+        let global_layouts = GlobalsLayouts::new(&renderer.device);
 
         let camera_bind_group = renderer.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &camera_layout.bind_group_layout,
+            layout: &global_layouts.globals,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -59,7 +58,7 @@ impl Engine {
             camera_bind_group,
             world,
             camera,
-            last_render_time
+            
             
         }
         
@@ -89,8 +88,8 @@ impl Engine {
             
             WindowEvent::RedrawRequested => {
                 let now = std::time::Instant::now();
-                let dt = now - self.last_render_time;
-                self.last_render_time = now;
+                let dt = now - self.renderer.last_render_time;
+                self.renderer.last_render_time = now;
                 self.update(dt);
                 match self.renderer.render(&self.world, &self.camera_bind_group) {
                     Ok(_) => {}

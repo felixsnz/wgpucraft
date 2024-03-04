@@ -1,7 +1,7 @@
 use anyhow::*;
 
 use crate::render::texture::*;
-use crate::world::block::*;
+use crate::scene::world::block::*;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
@@ -53,9 +53,9 @@ fn atlas_pos_to_coordinates(atlas_pos: [f32; 2], texture_corner: [u32; 2]) -> [f
 }
 
 pub struct Atlas {
-    pub diffuse_texture: Texture,
-    pub diffuse_bind_group: wgpu::BindGroup,
-    pub texture_bind_group_layout: wgpu::BindGroupLayout,
+    pub texture: Texture,
+    pub bind_group: wgpu::BindGroup,
+
 }
 
 impl Atlas {
@@ -83,27 +83,26 @@ impl Atlas {
         });
 
         let diffuse_bytes = include_bytes!("../../assets/images/textures_atlas.png");
-        let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "blocks.png").unwrap();
+        let texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "blocks.png").unwrap();
 
-        let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &texture_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
                 },
             ],
             label: Some("diffuse_bind_group"),
         });
 
         Ok(Self {
-            diffuse_texture,
-            diffuse_bind_group,
-            texture_bind_group_layout,
+            texture,
+            bind_group,
         })
     }
 }
