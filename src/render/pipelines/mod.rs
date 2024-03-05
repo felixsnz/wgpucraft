@@ -1,67 +1,62 @@
 
 pub mod terrain;
 
+use bytemuck::{Pod, Zeroable};
+use cgmath::{Matrix4, SquareMatrix};
+use wgpu::BindGroup;
 
-use std::marker::PhantomData;
+use super::{consts::Consts, texture::Texture};
 
-use wgpu::{BindGroup, BindGroupLayout};
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
+pub struct Globals {
+    /// Transformation from world coordinate space (with focus_off as the
+    /// origin) to the camera space
+    view_mat: [[f32; 4]; 4],
 
-use super::texture::{self, Texture};
+}
 
+// #[repr(C)]
+// #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+// pub struct Uniforms {
+//     //view_position: [f32; 4],
+//     view_proj: [[f32; 4]; 4],
+// }
 
+// impl Uniforms {
+//     pub fn new() -> Self {
+//         Self {
+//             //view_position: [0.0; 4],
+//             view_proj: cgmath::Matrix4::identity().into(),
+//         }
+//     }
 
-pub fn constructor(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    vertex_layouts: &[wgpu::VertexBufferLayout],
-    primitive_topology: wgpu::PrimitiveTopology,
-    shader: wgpu::ShaderModule,
-    config: &wgpu::SurfaceConfiguration,//in the future i better add a config struct global
+//     pub fn  update_view_proj(&mut self, /* position: Point3<f32>, */ camera_matrix: Matrix4<f32>, projection_matrix: Matrix4<f32>) {
+//         //self.view_position = position.to_homogeneous().into();
+//         self.view_proj = (projection_matrix * camera_matrix).into()
+//     }
+// }
 
-) -> wgpu::RenderPipeline {
+impl Globals {
+    /// Create global consts from the provided parameters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
 
-    let mut primitive = wgpu::PrimitiveState::default();
-    primitive.topology = primitive_topology;
-    primitive.front_face = wgpu::FrontFace::Ccw;
-    primitive.cull_mode = Some(wgpu::Face::Back);
+    ) -> Self {
+        Self {
+            view_mat: Matrix4::identity().into(),
 
-    //later use the config global struct to control this mode
-    primitive.polygon_mode = wgpu::PolygonMode::Fill;
-
-
-
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Render generic Pipeline"),
-        layout: Some(&layout),
-        primitive: primitive,
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: "vs_main",
-            buffers: vertex_layouts,
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: "fs_main",
-            targets: &[Some(wgpu::ColorTargetState {
-                format: config.format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        depth_stencil: None, //change this when add depth texture
-        multisample: wgpu::MultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        multiview: None,
-    })
+        }
+    }
 }
 
 
 
+// Global scene data spread across several arrays.
+pub struct GlobalModel {
+    pub globals: Consts<Globals>,
 
-
+}
 
 pub struct GlobalsLayouts {
     pub globals: wgpu::BindGroupLayout,
@@ -119,10 +114,35 @@ impl GlobalsLayouts {
         }
     }
 
+    fn base_global_entries(
+        global_model: &GlobalModel
+    ) -> Vec<wgpu::BindGroupEntry> {
+        vec![
+            // Global uniform
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: global_model.globals.buf().as_entire_binding(),
+            },
+        ]
+    }
+
+    pub fn bind(
+        &self,
+        device: &wgpu::Device,
+        global_model: &GlobalModel,
+    ) -> BindGroup {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.globals,
+            entries: &Self::base_global_entries(global_model),
+        });
+
+        bind_group
+    }
+
     pub fn bind_atlas_texture(
         &self,
         device: &wgpu::Device,
-        layout: &BindGroupLayout,
         texture: &Texture
     ) -> BindGroup {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {

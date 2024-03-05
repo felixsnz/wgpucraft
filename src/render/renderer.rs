@@ -4,12 +4,12 @@ use winit::window::Window as SysWindow;
 
 use crate::scene::world::World;
 
-use super::pipelines::GlobalsLayouts;
+use super::{consts::Consts, pipelines::{GlobalModel, GlobalsLayouts}};
 pub trait Draw {
     fn draw<'a>(
         &'a self, 
         render_pass: &mut wgpu::RenderPass<'a>, 
-        uniforms: &'a wgpu::BindGroup
+        globals: &'a wgpu::BindGroup
     ) -> Result<(), Error>;
 }
 
@@ -115,11 +115,34 @@ impl Renderer {
         }
     }
 
+    pub fn bind_globals(
+        &self,
+        global_model: &GlobalModel,
+    ) -> BindGroup {
+        self.layouts
+            .global
+            .bind(&self.device, global_model)
+    }
+
     pub fn update(&mut self) {
         //todo!();
     }
 
-    pub fn render(&mut self, world: &World, uniforms: &BindGroup) -> Result<(), wgpu::SurfaceError> {
+    pub fn create_consts<T: Copy + bytemuck::Pod>(
+        &mut self,
+        vals: &[T],
+    ) -> Consts<T> {
+        let mut consts = Consts::new(&self.device, vals.len());
+        consts.update(&self.queue, vals, 0);
+        consts
+    }
+
+    /// Update a set of constants with the provided values.
+    pub fn update_consts<T: Copy + bytemuck::Pod>(&self, consts: &mut Consts<T>, vals: &[T]) {
+        consts.update(&self.queue, vals, 0)
+    }
+
+    pub fn render(&mut self, world: &World, globals: &BindGroup) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -146,7 +169,7 @@ impl Renderer {
                 timestamp_writes: None,
             });
 
-            world.draw(&mut _render_pass, &uniforms).unwrap();
+            world.draw(&mut _render_pass, globals).unwrap();
         }
 
         
