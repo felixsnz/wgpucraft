@@ -5,6 +5,9 @@ pub mod atlas;
 pub mod mesh;
 pub mod model;
 pub mod buffer;
+pub mod consts;
+pub mod binding;
+
 
 
 

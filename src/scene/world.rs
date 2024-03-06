@@ -1,7 +1,8 @@
 pub mod block;
-use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pipelines::{constructor as pipeline_constructor, terrain::{self, TerrainPipeline}}, renderer::{Draw, Renderer}, Vertex };
+use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pipelines::terrain::TerrainPipeline, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use super::world::block::{Block, QuadVertex};
+use super::world::block::Block;
+
 
 use wgpu::Error;
 
@@ -45,13 +46,13 @@ impl World {                        ///
 
 
 impl Draw for World {
-    fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, uniforms: &'a wgpu::BindGroup) -> Result<(), Error> {
+    fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, globals: &'a wgpu::BindGroup) -> Result<(), Error> {
 
             render_pass.set_pipeline(&self.pipeline);
 
             render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.model.vbuf().slice(..));
-            render_pass.set_bind_group(1, &uniforms, &[]);
+            render_pass.set_bind_group(1, &globals, &[]);
             //render_pass.set_vertex_buffer(1, self.instance_buffer.buff.slice(..));
             render_pass.set_index_buffer(self.model.ibuf().slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.model.num_indices, 0, 0..1 as _);

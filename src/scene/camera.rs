@@ -5,7 +5,6 @@ use instant::Duration;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use std::f32::consts::FRAC_PI_2;
 
-use crate::render::buffer::Buffer;
 use crate::render::renderer::Renderer;
 
 #[rustfmt::skip]
@@ -18,25 +17,8 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Uniforms {
-    //view_position: [f32; 4],
-    view_proj: [[f32; 4]; 4],
-}
-
-impl Uniforms {
-    pub fn new() -> Self {
-        Self {
-            //view_position: [0.0; 4],
-            view_proj: cgmath::Matrix4::identity().into(),
-        }
-    }
-
-    pub fn update_view_proj(&mut self, /* position: Point3<f32>, */ camera_matrix: Matrix4<f32>, projection_matrix: Matrix4<f32>) {
-        //self.view_position = position.to_homogeneous().into();
-        self.view_proj = (projection_matrix * camera_matrix).into()
-    }
+pub struct Dependants {
+    pub view_proj:  [[f32; 4]; 4]
 }
 
 pub struct Camera {
@@ -48,12 +30,7 @@ pub struct Camera {
     pub projection: Projection,
     pub camera_controller: CameraController,
 
-    pub uniform_bind_group_layout: wgpu::BindGroupLayout,
-    pub uniform_bind_group: wgpu::BindGroup,
-    pub uniforms: Uniforms,
-    pub uniform_buffer: Buffer<Uniforms>,
-
-
+    pub dependants: Dependants
 }
 
 const WORLD_SIZE: u16 = 10;
@@ -70,33 +47,6 @@ impl Camera {
         );
         let camera_controller = CameraController::new(2.0, 2.1);
 
-        let uniforms = Uniforms::new();
-
-        let uniform_buffer = Buffer::new(&renderer.device, wgpu::BufferUsages::UNIFORM, &[uniforms]);
-
-        let uniform_bind_group_layout = renderer.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-            label: Some("uniform_bind_group_layout"),
-        });
-
-        let uniform_bind_group = renderer.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.buff.as_entire_binding(),
-            }],
-            label: Some("uniform_bind_group"),
-        });
-
         let mut camera = Self {
             position: position.into(),
             yaw: yaw.into(),
@@ -106,13 +56,12 @@ impl Camera {
             projection,
             camera_controller,
 
-            uniform_buffer,
-            uniform_bind_group,
-            uniform_bind_group_layout,
-            uniforms,
+            dependants: Dependants {
+                view_proj: Matrix4::identity().into()
+            }
         };
 
-        camera.update(&renderer.queue, Duration::from_secs(0));
+        camera.update_dependants(Duration::from_secs(0));
 
         return camera;
     }
@@ -159,11 +108,13 @@ impl Camera {
         self.projection.resize(new_size.width, new_size.height)
     }
 
-    pub fn update(&mut self, queue: &wgpu::Queue, dt: Duration) {
+    pub fn update_dependants(&mut self, dt: Duration) {
         self.update_camera_controller(dt);
-        self.uniforms.update_view_proj(/* self.position , */ self.calc_matrix(), self.projection.calc_matrix());
-        queue.write_buffer(&self.uniform_buffer.buff, 0, bytemuck::cast_slice(&[self.uniforms]));
+        let view_proj:  [[f32; 4]; 4] = (self.projection.calc_matrix() * self.calc_matrix()).into();
+        self.dependants = Dependants {view_proj}
     }
+
+    pub fn dependants(&self) -> &Dependants { &self.dependants }
 
     pub fn update_camera_controller(&mut self, dt: Duration) {
         let dt = dt.as_secs_f32();

@@ -12,41 +12,29 @@ use super::{consts::Consts, texture::Texture};
 pub struct Globals {
     /// Transformation from world coordinate space (with focus_off as the
     /// origin) to the camera space
-    view_mat: [[f32; 4]; 4],
+    view_proj: [[f32; 4]; 4],
 
 }
-
-// #[repr(C)]
-// #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-// pub struct Uniforms {
-//     //view_position: [f32; 4],
-//     view_proj: [[f32; 4]; 4],
-// }
-
-// impl Uniforms {
-//     pub fn new() -> Self {
-//         Self {
-//             //view_position: [0.0; 4],
-//             view_proj: cgmath::Matrix4::identity().into(),
-//         }
-//     }
-
-//     pub fn  update_view_proj(&mut self, /* position: Point3<f32>, */ camera_matrix: Matrix4<f32>, projection_matrix: Matrix4<f32>) {
-//         //self.view_position = position.to_homogeneous().into();
-//         self.view_proj = (projection_matrix * camera_matrix).into()
-//     }
-// }
 
 impl Globals {
     /// Create global consts from the provided parameters.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-
+        view_proj: [[f32; 4]; 4]
     ) -> Self {
         Self {
-            view_mat: Matrix4::identity().into(),
+            view_proj
 
         }
+    }
+}
+
+impl Default for Globals {
+    fn default() -> Self {
+        Self::new(
+            Matrix4::identity().into(),
+
+        )
     }
 }
 
