@@ -2,35 +2,8 @@ use cgmath::Vector3;
 
 use crate::render::atlas::MaterialType;
 
-use crate::render::Vertex;
+use crate::render::pipelines::terrain::TerrainVertex as QuadVertex;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct QuadVertex {
-    pos: [f32; 3],
-    texture_coordinates: [f32; 2],
-}
-
-impl QuadVertex {
-
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-
-}
-
-
-impl Vertex for QuadVertex {
-
-    
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        use std::mem;
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<QuadVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
 pub const CHUNK_Y_SIZE: usize = 200;
 pub const CHUNK_Z_SIZE: usize = 16;
 pub const CHUNK_X_SIZE: usize = 16;

@@ -1,11 +1,10 @@
-use crate::scene::world::{
-    block::QuadVertex, 
-};
 
 use crate::render::{buffer::Buffer, mesh::Mesh};
+
+use super::pipelines::terrain::TerrainVertex;
 /// Represents a mesh that has been sent to the GPU.
 pub struct Model{
-    vbuf: Buffer<QuadVertex>,
+    vbuf: Buffer<TerrainVertex>,
     ibuf: Buffer<u16>,
     pub num_indices: u32,
 }

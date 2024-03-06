@@ -1,4 +1,4 @@
-use wgpu::{BindGroupLayout, PipelineLayout, RenderPipeline};
+use wgpu::RenderPipeline;
 
 use super::GlobalsLayouts;
 
@@ -8,8 +8,8 @@ use crate::render::Vertex;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct TerrainVertex {
-    pos: [f32; 3],
-    texture_coordinates: [f32; 2],
+    pub pos: [f32; 3],
+    pub texture_coordinates: [f32; 2],
 }
 
 impl TerrainVertex {

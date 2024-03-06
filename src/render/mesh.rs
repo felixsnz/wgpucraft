@@ -1,10 +1,14 @@
-use crate::scene::world::{block::{Block, QuadVertex}};
+use crate::scene::world::block::Block;
+
+use super::pipelines::terrain::TerrainVertex;
 
 #[derive(Clone)]
 
+//TODO: change TerrainVertex for Vertex trait
+
 /// Represents a vec-based mesh on the CPU
 pub struct Mesh{
-    verts: Vec<QuadVertex>,
+    verts: Vec<TerrainVertex>,
     indices: Vec<u16>
 }
 
@@ -16,9 +20,9 @@ impl Mesh{
     pub fn clear(&mut self) { self.verts.clear(); }
 
     /// Get a slice referencing the vertices of this mesh.
-    pub fn vertices(&self) -> &[QuadVertex] { &self.verts }
+    pub fn vertices(&self) -> &[TerrainVertex] { &self.verts }
 
-    pub fn push(&mut self, vert: QuadVertex) { self.verts.push(vert); }
+    pub fn push(&mut self, vert: TerrainVertex) { self.verts.push(vert); }
 
     // new method to add indices
     pub fn push_indices(&mut self, indices: &[u16]) {
@@ -30,7 +34,7 @@ impl Mesh{
         &self.indices
     }
 
-    pub fn iter_verts(&self) -> std::slice::Iter<QuadVertex> { self.verts.iter() }
+    pub fn iter_verts(&self) -> std::slice::Iter<TerrainVertex> { self.verts.iter() }
 
     pub fn iter_indices(&self) -> std::vec::IntoIter<u16> { self.indices.clone().into_iter() }
 
