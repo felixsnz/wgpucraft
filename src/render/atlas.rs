@@ -1,7 +1,7 @@
 use anyhow::*;
 
 use crate::render::texture::*;
-use crate::scene::world::block::*;
+use crate::scene::terrain::block::*;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]

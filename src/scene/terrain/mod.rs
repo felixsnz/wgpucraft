@@ -1,24 +1,24 @@
 pub mod block;
 use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pipelines::terrain::TerrainPipeline, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use super::world::block::Block;
+use super::terrain::block::Block;
 
 
 use wgpu::Error;
 
 
-pub struct World {
+pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
     model: Model// the world temporarily has only one block model, for debug purposes
 
 }
 
-impl World {                        ///
+impl Terrain {                        ///
     pub fn new(renderer: &Renderer) -> Self {
         let atlas = Atlas::new(&renderer.device, &renderer.queue).unwrap();
 
-        let shader = renderer.device.create_shader_module(wgpu::include_wgsl!("../../assets/shaders/shader.wgsl"));
+        let shader = renderer.device.create_shader_module(wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl"));
 
         let terrain_pipeline = TerrainPipeline::new(
             &renderer.device, 
@@ -45,7 +45,7 @@ impl World {                        ///
 }
 
 
-impl Draw for World {
+impl Draw for Terrain {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, globals: &'a wgpu::BindGroup) -> Result<(), Error> {
 
             render_pass.set_pipeline(&self.pipeline);

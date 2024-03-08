@@ -2,10 +2,10 @@ use wgpu::BindGroup;
 
 use crate::render::{pipelines::{GlobalModel, Globals}, renderer::Renderer};
 
-use self::{camera::Camera, world::World};
+use self::{camera::Camera, terrain::Terrain};
 
 pub mod camera;
-pub mod world;
+pub mod terrain;
 
 
 
@@ -14,7 +14,7 @@ pub struct Scene {
     pub data: GlobalModel,
     pub globals_bind_group: BindGroup,
     pub camera: Camera,
-    pub world: World,
+    pub terrain: Terrain,
 }
 
 impl Scene {
@@ -34,7 +34,7 @@ impl Scene {
 
         let camera = Camera::new(&renderer, (0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
 
-        let world = World::new(
+        let terrain = Terrain::new(
             &renderer,
         );
 
@@ -46,7 +46,7 @@ impl Scene {
             data,
             globals_bind_group,
             camera,
-            world,
+            terrain,
 
     
         }

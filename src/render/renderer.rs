@@ -2,7 +2,7 @@ use wgpu::{BindGroup, Error};
 use instant::Instant;
 use winit::window::Window as SysWindow;
 
-use crate::scene::world::World;
+use crate::scene::terrain::Terrain;
 
 use super::{consts::Consts, pipelines::{GlobalModel, GlobalsLayouts}};
 pub trait Draw {
@@ -142,7 +142,7 @@ impl Renderer {
         consts.update(&self.queue, vals, 0)
     }
 
-    pub fn render(&mut self, world: &World, globals: &BindGroup) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, terrain: &Terrain, globals: &BindGroup) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -169,7 +169,7 @@ impl Renderer {
                 timestamp_writes: None,
             });
 
-            world.draw(&mut _render_pass, globals).unwrap();
+            terrain.draw(&mut _render_pass, globals).unwrap();
         }
 
         

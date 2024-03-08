@@ -1,4 +1,4 @@
-use crate::scene::world::block::Block;
+use crate::scene::terrain::block::Block;
 
 use super::pipelines::terrain::TerrainVertex;
 

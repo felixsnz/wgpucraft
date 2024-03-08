@@ -65,7 +65,7 @@ impl GameState {
                 let dt = now - self.renderer.last_render_time;
                 self.renderer.last_render_time = now;
                 self.update(dt);
-                match self.renderer.render(&self.scene.world, &self.scene.globals_bind_group) {
+                match self.renderer.render(&self.scene.terrain, &self.scene.globals_bind_group) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
                     Err(wgpu::SurfaceError::Lost) => self.renderer.resize(self.renderer.size),
