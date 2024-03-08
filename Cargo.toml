@@ -15,6 +15,8 @@ cgmath = "0.18"
 anyhow = "1.0.79"
 clap = "4.5.1"
 instant = "0.1" #because std::time::Instant panics on WASM
+bevy_ecs = "0.13.0"
+
 
 [dependencies.image]
 version = "0.24"

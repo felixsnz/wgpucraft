@@ -2,8 +2,6 @@
 pub mod launcher;
 pub mod render;
 pub mod scene;
-pub mod ecs;
-
 
 use render::renderer::Renderer;
 use scene::Scene;
