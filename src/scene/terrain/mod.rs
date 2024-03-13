@@ -16,13 +16,15 @@ pub struct Terrain {
 
 impl Terrain {                        ///
     pub fn new(renderer: &Renderer) -> Self {
-        let atlas = Atlas::new(&renderer.device, &renderer.queue).unwrap();
+        
 
         let shader = renderer.device.create_shader_module(wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl"));
 
+        let global_layouts = GlobalsLayouts::new(&renderer.device);
+        let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
         let terrain_pipeline = TerrainPipeline::new(
             &renderer.device, 
-            &GlobalsLayouts::new(&renderer.device),
+            &global_layouts,
             shader,
             &renderer.config
         );

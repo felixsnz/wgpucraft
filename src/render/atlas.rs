@@ -3,6 +3,8 @@ use anyhow::*;
 use crate::render::texture::*;
 use crate::scene::terrain::block::*;
 
+use super::pipelines::GlobalsLayouts;
+
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum MaterialType {
@@ -59,34 +61,13 @@ pub struct Atlas {
 }
 
 impl Atlas {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<Self> {
-        let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                    count: None,
-                },
-            ],
-            label: Some("texture_bind_group_layout"),
-        });
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, layouts: &GlobalsLayouts) -> Result<Self> {
 
         let diffuse_bytes = include_bytes!("../../assets/images/textures_atlas.png");
         let texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "blocks.png").unwrap();
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &texture_bind_group_layout,
+            layout: &layouts.atlas_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
