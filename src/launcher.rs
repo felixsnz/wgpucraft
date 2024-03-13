@@ -29,6 +29,7 @@ pub fn run() {
 
 
     let mut state = GameState::new(window, runtime);
+    state.initialize();
     event_loop.set_control_flow(ControlFlow::Poll);
 
     event_loop.run(move | event, elwt | {

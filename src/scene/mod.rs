@@ -1,4 +1,5 @@
 use wgpu::BindGroup;
+use winit::event::WindowEvent;
 
 use crate::render::{pipelines::{GlobalModel, Globals}, renderer::Renderer};
 
@@ -69,5 +70,12 @@ impl Scene {
 
         )])
 
+    }
+
+    pub fn handle_input_event(
+        &mut self,
+        event: &WindowEvent
+    ) -> bool {
+        self.camera.input_keyboard(&event)
     }
 }
