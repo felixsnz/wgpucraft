@@ -8,8 +8,7 @@ use winit::{
         window::WindowBuilder,
     };
 
-use crate::GameState;
-
+use crate::Game;
 
 pub fn run() {
 
@@ -28,8 +27,8 @@ pub fn run() {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
 
-    let mut state = GameState::new(window, runtime);
-    state.initialize();
+    let mut game = Game::new(window, runtime);
+    game.initialize();
     event_loop.set_control_flow(ControlFlow::Poll);
 
     event_loop.run(move | event, elwt | {
@@ -38,7 +37,7 @@ pub fn run() {
             
 
             Event::DeviceEvent { ref event, .. } => {
-                state.input(event);
+                game.input(event);
             }
             
             
@@ -46,16 +45,16 @@ pub fn run() {
                 window_id,
                 event
             }
-            if window_id == state.window.id() => {
+            if window_id == game.window.id() => {
                 
 
-                state.handle_window_event(event, elwt)
+                game.handle_window_event(event, elwt)
 
             }
             Event::AboutToWait => {
                 // RedrawRequested will only trigger once, unless we manually
                 // request it.
-                state.window.request_redraw();
+                game.window.request_redraw();
             }
             
             _ => ()

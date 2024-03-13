@@ -15,7 +15,7 @@ use winit::{
 
 
 #[derive(PartialEq)]
-pub enum State {
+pub enum GameState {
 
     PLAYING,
     PAUSED
@@ -24,15 +24,15 @@ pub enum State {
 
 
 
-pub struct GameState {
+pub struct Game {
     pub window: Window,
     renderer: Renderer,
     scene: Scene,
-    state: State
+    state: GameState
 
 }
 
-impl GameState {
+impl Game {
 
     pub fn new(window: Window, runtime: Runtime) -> Self {
 
@@ -44,7 +44,7 @@ impl GameState {
             window,
             renderer,
             scene,
-            state: State::PLAYING,
+            state: GameState::PLAYING,
         }
     }
 
@@ -87,13 +87,13 @@ impl GameState {
                 ..
             } => {
                 self.state = match self.state {
-                    State::PAUSED =>
+                    GameState::PAUSED =>
                     {
                         self.window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
                         self.window.set_cursor_visible(false);
-                        State::PLAYING
+                        GameState::PLAYING
                     },
-                    State::PLAYING =>
+                    GameState::PLAYING =>
                     {
                         let center = winit::dpi::PhysicalPosition::new(self.renderer.size.width / 2, self.renderer.size.height / 2);
                         self.window.set_cursor_position(center).unwrap_or_else(|e| {
@@ -103,7 +103,7 @@ impl GameState {
                         self.window.set_cursor_visible(true);
 
                         
-                        State::PAUSED
+                        GameState::PAUSED
                     },
                     
                 }
@@ -143,7 +143,7 @@ impl GameState {
 
     pub fn input(&mut self, event: &DeviceEvent) {
 
-        if self.state == State::PLAYING {
+        if self.state == GameState::PLAYING {
             self.scene.camera.input(event);
         }
     }
