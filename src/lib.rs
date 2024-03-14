@@ -57,7 +57,7 @@ impl Game {
             },
 
             WindowEvent::Resized(physical_size) => {
-                self.renderer.resize(physical_size);
+                self.resize(physical_size);
             }, 
             WindowEvent::RedrawRequested => {
                 let now = std::time::Instant::now();
@@ -67,7 +67,7 @@ impl Game {
                 match self.renderer.render(&self.scene.terrain, &self.scene.globals_bind_group) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
-                    Err(wgpu::SurfaceError::Lost) => self.renderer.resize(self.renderer.size),
+                    Err(wgpu::SurfaceError::Lost) => self.resize(self.renderer.size),
                     // The system is out of memory, we should probably quit
                     Err(wgpu::SurfaceError::OutOfMemory) => elwt.exit(),
                     // All other errors (Outdated, Timeout) should be resolved by the next frame
@@ -132,8 +132,10 @@ impl Game {
 
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.renderer.resize(new_size);
         self.scene.camera.resize(new_size);
+        self.renderer.resize(new_size);
+
+        
     }
 
     pub fn update(&mut self, dt: std::time::Duration) {
