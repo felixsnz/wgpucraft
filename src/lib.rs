@@ -50,7 +50,7 @@ impl Game {
 
     //TODO: add global settings as parameter
     pub fn handle_window_event(&mut self, event: WindowEvent, elwt: &EventLoopWindowTarget<()>) {
-        if !self.scene.handle_input_event(&event) {
+        if !self.scene.handle_input_event(&event, &self.state) {
         match event {
             WindowEvent::CloseRequested  => {
                 elwt.exit()
@@ -75,9 +75,9 @@ impl Game {
                 }
                 
             },
-            WindowEvent::MouseWheel { delta, .. } => {
-                self.scene.camera.camera_controller.process_scroll(&delta);
-            },
+            // WindowEvent::MouseWheel { delta, .. } => {
+            //     self.scene.camera.camera_controller.process_scroll(&delta);
+            // },
             WindowEvent::KeyboardInput {
                 event: KeyEvent {
                     physical_key:PhysicalKey::Code(KeyCode::Escape),
@@ -148,10 +148,6 @@ impl Game {
         if self.state == GameState::PLAYING {
             self.scene.camera.input(event);
         }
-    }
-
-    pub fn input_keyboard(&mut self, event: &WindowEvent) -> bool {
-        self.scene.camera.input_keyboard(event)
     }
 
     

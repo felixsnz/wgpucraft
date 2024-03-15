@@ -1,7 +1,7 @@
 use wgpu::BindGroup;
 use winit::event::WindowEvent;
 
-use crate::render::{pipelines::{GlobalModel, Globals}, renderer::Renderer};
+use crate::{render::{pipelines::{GlobalModel, Globals}, renderer::Renderer}, GameState};
 
 use self::{camera::Camera, terrain::Terrain};
 
@@ -74,8 +74,14 @@ impl Scene {
 
     pub fn handle_input_event(
         &mut self,
-        event: &WindowEvent
+        event: &WindowEvent,
+        game_state: &GameState
     ) -> bool {
-        self.camera.input_keyboard(&event)
+        if *game_state == GameState::PLAYING{
+            self.camera.input_keyboard(&event)
+        } else {
+            false
+        }
+        
     }
 }
