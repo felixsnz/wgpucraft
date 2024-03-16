@@ -1,5 +1,5 @@
 pub mod block;
-use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pipelines::terrain::TerrainPipeline, renderer::{Draw, Renderer}};
+use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}, Vertex};
 use crate::render::pipelines::GlobalsLayouts;
 use super::terrain::block::Block;
 
@@ -10,7 +10,7 @@ use wgpu::Error;
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
-    model: Model// the world temporarily has only one block model, for debug purposes
+    model: Model<BlockVertex>// the world temporarily has only one block model, for debug purposes
 
 }
 

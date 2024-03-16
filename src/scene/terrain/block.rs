@@ -2,16 +2,16 @@ use cgmath::Vector3;
 
 use crate::render::atlas::MaterialType;
 
-use crate::render::pipelines::terrain::TerrainVertex as QuadVertex;
+use crate::render::pipelines::terrain::BlockVertex;
 
 pub const CHUNK_Y_SIZE: usize = 200;
 pub const CHUNK_Z_SIZE: usize = 16;
 pub const CHUNK_X_SIZE: usize = 16;
 
 
-pub fn quad_vertex(pos: [i8; 3], material_type: MaterialType, texture_corners: [u32; 2], position: [i32; 3], quad_side: QuadSide) -> QuadVertex {
+pub fn quad_vertex(pos: [i8; 3], material_type: MaterialType, texture_corners: [u32; 2], position: [i32; 3], quad_side: QuadSide) -> BlockVertex {
     let tc = material_type.get_texture_coordinates(texture_corners, quad_side);
-    QuadVertex {
+    BlockVertex {
         pos: [
             pos[0] as f32 + position[0] as f32,
             pos[1] as f32 + position[1] as f32,
@@ -43,7 +43,7 @@ impl QuadSide {
         }
     }
 
-    fn get_vertices(self, material_type: MaterialType, position: [i32; 3]) -> [QuadVertex; 4] {
+    fn get_vertices(self, material_type: MaterialType, position: [i32; 3]) -> [BlockVertex; 4] {
         match self {
             QuadSide::TOP => [
                 quad_vertex([0, 1, 0], material_type, [0, 0], position, self),
@@ -87,7 +87,7 @@ impl QuadSide {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Quad {
-    pub vertices: [QuadVertex; 4],
+    pub vertices: [BlockVertex; 4],
     pub side: QuadSide,
 }
 

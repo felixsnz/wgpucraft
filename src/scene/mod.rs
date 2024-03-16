@@ -1,7 +1,7 @@
 use wgpu::BindGroup;
 use winit::event::WindowEvent;
 
-use crate::{render::{pipelines::{GlobalModel, Globals}, renderer::Renderer}, GameState};
+use crate::{render::{pipelines::{terrain::BlockVertex, GlobalModel, Globals}, renderer::Renderer}, GameState};
 
 use self::{camera::Camera, terrain::Terrain};
 

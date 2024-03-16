@@ -7,25 +7,25 @@ use crate::render::Vertex;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct TerrainVertex {
+pub struct BlockVertex {
     pub pos: [f32; 3],
     pub texture_coordinates: [f32; 2],
 }
 
-impl TerrainVertex {
+impl BlockVertex {
 
     const ATTRIBS: [wgpu::VertexAttribute; 2] =
         wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
 
 }
 
-impl Vertex for TerrainVertex {
+impl Vertex for BlockVertex {
 
     
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem;
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<TerrainVertex>() as wgpu::BufferAddress,
+            array_stride: mem::size_of::<BlockVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &Self::ATTRIBS,
         }
@@ -76,7 +76,7 @@ impl TerrainPipeline {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[TerrainVertex::desc()],
+                buffers: &[BlockVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
