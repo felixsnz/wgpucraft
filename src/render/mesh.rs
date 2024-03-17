@@ -1,4 +1,4 @@
-use crate::scene::terrain::block::Block;
+use crate::scene::terrain::{block::Block, chunk::Chunk};
 
 use super::{pipelines::terrain::BlockVertex, Vertex};
 
@@ -40,14 +40,15 @@ impl<V: Vertex> Mesh<V>
 
     pub fn iter_indices(&self) -> std::vec::IntoIter<u16> { self.indices.clone().into_iter() }
 
-    pub fn push_block(&mut self, block: Block)
+    pub fn push_block(&mut self, block: Block, block_num: u16)
         where Vec<V>: Extend<BlockVertex>
     {
 
 
         let mut block_vertices = Vec::with_capacity(4 * 6);
         let mut block_indices = Vec::with_capacity(6 * 6);
-        let mut quad_counter: u16 = 0;
+        let mut quad_counter: u16 = 6 * block_num;
+
         for quad in block.quads.iter() {
             block_vertices.extend_from_slice(&quad.vertices);
             block_indices.extend_from_slice(&quad.get_indices(quad_counter));
@@ -59,6 +60,18 @@ impl<V: Vertex> Mesh<V>
 
 
 
+    }
+
+    pub fn push_chunk(&mut self, chunk: &Chunk)
+        where Vec<V>: Extend<BlockVertex>
+    {
+
+        let mut block_counter = 0;
+        for block in &chunk.blocks {
+            self.push_block(*block, block_counter);
+            block_counter += 1;
+        }
+        
     }
 
     

@@ -1,46 +1,38 @@
-use crate::render::{buffer::Buffer, pipelines::terrain::BlockInstance};
+use crate::render::atlas::MaterialType;
 
-use super::block::Block;
-
-use cgmath::prelude::*;
-use wgpu::Device;
+use super::{block::Block, LAND_LEVEL};
 
 
-const CHUNK_Z_SIZE:u16 = 2;
-const CHUNK_AREA:u16 = 2;
+pub const CHUNK_Y_SIZE:i32 = 10;
+pub const CHUNK_AREA:u16 = 16;
 
 
 
 pub struct Chunk {
-    pub blocks: Vec<BlockInstance>,
-    pub buff: Buffer<BlockInstance>
+    pub blocks: Vec<Block>,
+
 }
 
-
 impl Chunk {
-    pub fn new(device: &Device, offset: [i32; 3]) -> Self {
-        const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(CHUNK_AREA as f32 * 0.5, 0.0, CHUNK_Z_SIZE as f32 * 0.5);
+    pub fn new(offset: [i32; 3]) -> Self {
+
         
-        let blocks = (0..CHUNK_Z_SIZE).flat_map(|z| {
-            (0..CHUNK_AREA).map(move |x| {
-                let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - INSTANCE_DISPLACEMENT;
+        // Assuming CHUNK_Y_SIZE is a usize or similar that represents the height.
+        let blocks = (0..CHUNK_AREA).flat_map(|z| {
+            (0..CHUNK_AREA).flat_map(move |x| {
+                (0..CHUNK_Y_SIZE).map(move |y| { // Iterate over y dimension
+                    let position = cgmath::Vector3 { x: x as i32, y: y as i32, z: z as i32 };
 
-                let rotation = if position.is_zero() {
-                    // this is needed so an object at (0, 0, 0) won't get scaled to zero
-                    // as Quaternions can affect scale if they're not created correctly
-                    cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
-                } else {
-                    cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
-                };
+                    let mut material_type = MaterialType::GRASS;
+                    if y < LAND_LEVEL as i32 {
+                        material_type = MaterialType::DIRT
+                    }
 
-                BlockInstance::new(position, rotation)
+                    Block::new(material_type, position.into(), offset)
+                })
             })
         }).collect::<Vec<_>>();
-        let buff = Buffer::new(&device, wgpu::BufferUsages::VERTEX, &blocks);
 
-        Self {
-            blocks,
-            buff
-        }
+        Self { blocks }
     }
 }

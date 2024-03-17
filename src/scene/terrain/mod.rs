@@ -1,22 +1,19 @@
 pub mod block;
 pub mod chunk;
-use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::Model, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
+use crate::render::{atlas::Atlas, mesh::Mesh, model::Model, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
 use self::chunk::Chunk;
 
-use super::terrain::block::Block;
-
-
 use wgpu::Error;
 
-pub const WORLD_SIZE: usize = 10;
+pub const WORLD_SIZE: usize = 1;
+pub const LAND_LEVEL: i16 = 9;
 
 
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
     model: Model<BlockVertex>, // the world temporarily has only one block model, for debug purposes
-    chunks: Vec<Chunk>
 
 }
 
@@ -34,18 +31,16 @@ impl Terrain {                        ///
             shader,
             &renderer.config
         );
-        
-        let block = Block::new(MaterialType::GRASS, [0,0,0], [0,0,0]);
-
-        let mut chunks = vec![];
-        for x in 0..WORLD_SIZE {
-            let chunk = Chunk::new(&renderer.device, [0,0,0]);
-            chunks.push(chunk)
+        let mut mesh = Mesh::new();
+        for _ in 0..WORLD_SIZE {
+            let chunk = Chunk::new( [0,0,0]);
+            
+            mesh.push_chunk(&chunk);
         }
 
 
-        let mut mesh = Mesh::new();
-        mesh.push_block(block);
+        
+        
 
         let model = Model::new(&renderer.device, &mesh).unwrap();
 
@@ -54,7 +49,6 @@ impl Terrain {                        ///
             pipeline: terrain_pipeline.pipeline,
             atlas,
             model,
-            chunks
         }
     }
 }
@@ -68,9 +62,8 @@ impl Draw for Terrain {
             render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.model.vbuf().slice(..));
             render_pass.set_bind_group(1, &globals, &[]);
-            render_pass.set_vertex_buffer(1, self.chunks[0].buff.buff.slice(..));
             render_pass.set_index_buffer(self.model.ibuf().slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.model.num_indices, 0, 0..self.chunks[0].blocks.len() as _);
+            render_pass.draw_indexed(0..self.model.num_indices, 0, 0..1 as _);
         
 
         Ok(())

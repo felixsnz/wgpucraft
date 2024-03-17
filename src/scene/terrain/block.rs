@@ -4,9 +4,8 @@ use crate::render::atlas::MaterialType;
 
 use crate::render::pipelines::terrain::BlockVertex;
 
-pub const CHUNK_Y_SIZE: usize = 200;
-pub const CHUNK_Z_SIZE: usize = 16;
-pub const CHUNK_X_SIZE: usize = 16;
+use crate::scene::terrain::chunk::CHUNK_AREA;
+
 
 
 pub fn quad_vertex(pos: [i8; 3], material_type: MaterialType, texture_corners: [u32; 2], position: [i32; 3], quad_side: QuadSide) -> BlockVertex {
@@ -132,9 +131,9 @@ impl Block {
 
     fn generate_quads(material_type: MaterialType, position: [i32; 3], chunk_offset: [i32; 3]) -> [Quad; 6] {
         let world_pos = [
-            position[0] + (chunk_offset[0] * CHUNK_X_SIZE as i32),
+            position[0] + (chunk_offset[0] * CHUNK_AREA as i32),
             position[1],
-            position[2] + (chunk_offset[2] * CHUNK_Z_SIZE as i32),
+            position[2] + (chunk_offset[2] * CHUNK_AREA as i32),
         ];
 
         let top = Quad::new(material_type, QuadSide::TOP, world_pos);
