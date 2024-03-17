@@ -4,7 +4,7 @@ use winit::window::Window as SysWindow;
 
 use crate::scene::terrain::Terrain;
 
-use super::{consts::Consts, pipelines::{GlobalModel, GlobalsLayouts}};
+use super::{consts::Consts, pipelines::{GlobalModel, GlobalsLayouts}, texture::{self, Texture}};
 pub trait Draw {
     fn draw<'a>(
         &'a self, 
@@ -26,7 +26,8 @@ pub struct Renderer {
     pub config: wgpu::SurfaceConfiguration,
     pub queue: wgpu::Queue,
     pub last_render_time: Instant,
-    pub layouts: Layouts
+    pub layouts: Layouts,
+    depth_texture: Texture
 }
 
 impl Renderer {
@@ -95,6 +96,8 @@ impl Renderer {
 
         let layouts = Layouts { global: GlobalsLayouts::new(&device)};
 
+        let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
+
         Self {
             surface,
             device,
@@ -102,7 +105,8 @@ impl Renderer {
             config,
             size,
             last_render_time,
-            layouts
+            layouts,
+            depth_texture
         }
     }
 
@@ -164,7 +168,14 @@ impl Renderer {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None, //later modified when implement depth texture
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store
+                    }),
+                    stencil_ops: None,
+                }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
