@@ -2,7 +2,7 @@
 
 use wgpu::BindGroup;
 
-pub use crate::render::{renderer::Renderer, texture::Texture};
+use crate::render::{renderer::Renderer, texture::Texture};
 
 impl Renderer {
 

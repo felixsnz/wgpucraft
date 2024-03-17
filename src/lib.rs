@@ -143,7 +143,7 @@ impl Game {
         self.renderer.update()
     }
 
-    pub fn input(&mut self, event: &DeviceEvent) {
+    pub fn handle_device_input(&mut self, event: &DeviceEvent, _: &EventLoopWindowTarget<()>) {
 
         if self.state == GameState::PLAYING {
             self.scene.camera.input(event);
