@@ -129,6 +129,10 @@ impl Block {
         }
     }
 
+    pub fn get_vec_position(&self) -> Vector3<i32>{
+        Vector3::new(self.position[0], self.position[1], self.position[2])
+    }
+
     fn generate_quads(material_type: MaterialType, position: [i32; 3], chunk_offset: [i32; 3]) -> [Quad; 6] {
         let world_pos = [
             position[0] + (chunk_offset[0] * CHUNK_AREA as i32),

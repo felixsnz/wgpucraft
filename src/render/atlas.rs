@@ -31,7 +31,7 @@ impl MaterialType {
             MaterialType::ROCK => atlas_pos_to_coordinates([3.0, 0.0], texture_corner),
             MaterialType::WATER => atlas_pos_to_coordinates([0.0, 15.0], texture_corner),
             MaterialType::AIR => [0.0, 0.0],
-            MaterialType::DEBUG => atlas_pos_to_coordinates([15.0, 0.0], texture_corner),
+            MaterialType::DEBUG => atlas_pos_to_coordinates([15.0, 3.0], texture_corner),
         }
     }
 }

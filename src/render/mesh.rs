@@ -1,6 +1,8 @@
-use crate::scene::terrain::{block::Block, chunk::Chunk};
+use cgmath::Vector3;
 
-use super::{pipelines::terrain::BlockVertex, Vertex};
+use crate::scene::terrain::{block::Block, chunk::{Chunk, CHUNK_AREA, CHUNK_Y_SIZE}};
+
+use super::{atlas::MaterialType, pipelines::terrain::BlockVertex, Vertex};
 
 #[derive(Clone)]
 
@@ -40,38 +42,51 @@ impl<V: Vertex> Mesh<V>
 
     pub fn iter_indices(&self) -> std::vec::IntoIter<u16> { self.indices.clone().into_iter() }
 
-    pub fn push_block(&mut self, block: Block, block_num: u16)
-        where Vec<V>: Extend<BlockVertex>
-    {
-
-
-        let mut block_vertices = Vec::with_capacity(4 * 6);
-        let mut block_indices = Vec::with_capacity(6 * 6);
-        let mut quad_counter: u16 = 6 * block_num;
-
-        for quad in block.quads.iter() {
-            block_vertices.extend_from_slice(&quad.vertices);
-            block_indices.extend_from_slice(&quad.get_indices(quad_counter));
-            quad_counter += 1;
-        }
-
-        self.verts.extend(block_vertices);
-        self.indices.extend(block_indices)
-
-
-
-    }
-
     pub fn push_chunk(&mut self, chunk: &Chunk)
         where Vec<V>: Extend<BlockVertex>
     {
+        for y in 0.. CHUNK_Y_SIZE{
+            for z in 0..CHUNK_AREA {
+                for x in 0..CHUNK_AREA {
 
-        let mut block_counter = 0;
-        for block in &chunk.blocks {
-            self.push_block(*block, block_counter);
-            block_counter += 1;
+                    let mut block_vertices = Vec::with_capacity(4 * 6 );
+                    let mut block_indices = Vec::with_capacity(6 * 6);
+                    let block = chunk.blocks[y][z][x];
+
+                    if block.material_type as i32 == MaterialType::AIR as i32 {
+                        continue;
+                    }
+
+                    let mut visible = false;
+
+                    let mut quad_counter = 0;
+                    for quad in block.quads {
+
+                        let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec() ;
+
+
+                        if Chunk::pos_in_chunk_bounds(neighbour_pos) {
+                            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.z as usize][neighbour_pos.x as usize];
+
+                            if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
+                                visible = true;
+                            }
+
+                        } else {
+                            visible = true
+                        }
+                        if visible {
+                            block_vertices.extend_from_slice(&quad.vertices);
+                            block_indices.extend_from_slice(&quad.get_indices(quad_counter));
+                            quad_counter += 1;
+                        }
+                    }
+                    let block_indices: Vec<u16> = block_indices.iter().map(|i| i + self.verts.len() as u16).collect();
+                    self.verts.extend(block_vertices);
+                    self.indices.extend(block_indices);
+                }
+            }
         }
-        
     }
 
     

@@ -7,7 +7,7 @@ use self::chunk::Chunk;
 use wgpu::Error;
 
 pub const WORLD_SIZE: usize = 1;
-pub const LAND_LEVEL: i16 = 9;
+pub const LAND_LEVEL: usize = 9;
 
 
 pub struct Terrain {
@@ -21,7 +21,9 @@ impl Terrain {                        ///
     pub fn new(renderer: &Renderer) -> Self {
         
 
-        let shader = renderer.device.create_shader_module(wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl"));
+        let shader = renderer.device.create_shader_module(
+            wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl")
+        );
 
         let global_layouts = GlobalsLayouts::new(&renderer.device);
         let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
