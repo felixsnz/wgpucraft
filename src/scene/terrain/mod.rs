@@ -2,12 +2,12 @@ pub mod block;
 pub mod chunk;
 use crate::render::{atlas::Atlas, mesh::Mesh, model::Model, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use self::chunk::Chunk;
+use self::chunk::{Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
 
 use wgpu::Error;
 
 pub const WORLD_SIZE: usize = 1;
-pub const LAND_LEVEL: usize = 9;
+pub const LAND_LEVEL: usize = 2;
 
 
 pub struct Terrain {
