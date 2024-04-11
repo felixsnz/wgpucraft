@@ -4,8 +4,8 @@ use crate::render::atlas::MaterialType;
 
 use super::{block::Block, LAND_LEVEL};
 
-pub const CHUNK_Y_SIZE:usize = 1;
-pub const CHUNK_AREA:usize = 2;
+pub const CHUNK_Y_SIZE:usize = 200;
+pub const CHUNK_AREA:usize =50;
 
 pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
 
@@ -46,25 +46,6 @@ impl Chunk {
                     else {
                         MaterialType::AIR
                     };
-
-                    // let material_type =
-                    // if (position == cgmath::Vector3 { x:0, y:0, z:0 }){
-                    //     MaterialType::GRASS
-                    // }
-                    // else if (position == cgmath::Vector3 { x:1, y:0, z:0 }){
-                    //     MaterialType::DIRT
-                    // }
-                    // else if (position == cgmath::Vector3 { x:0, y:0, z:1}){
-                    //     MaterialType::ROCK
-                    // }
-                    // else if (position == cgmath::Vector3 { x:1, y:0, z:1}){
-                    //     MaterialType::WATER
-                    // }
-                    // else {
-                    //     MaterialType::DEBUG
-                    // };
-
-                    
 
                     blocks[y][x][z] = Block::new(material_type, position.into(), offset);
                 }

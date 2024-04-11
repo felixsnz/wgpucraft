@@ -1,12 +1,10 @@
 use cgmath::Vector3;
 
-use crate::scene::terrain::{block::Block, chunk::{Chunk, CHUNK_AREA, CHUNK_Y_SIZE, TOTAL_CHUNK_SIZE}};
+use crate::scene::terrain::chunk::{Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
 
 use super::{atlas::MaterialType, pipelines::terrain::BlockVertex, Vertex};
 
 #[derive(Clone)]
-
-//TODO: change TerrainVertex for Vertex trait
 
 /// Represents a vec-based mesh on the CPU
 pub struct Mesh<V: Vertex> {
@@ -45,42 +43,25 @@ impl<V: Vertex> Mesh<V>
     pub fn push_chunk(&mut self, chunk: &Chunk)
         where Vec<V>: Extend<BlockVertex>
     {
-        
         for y in 0.. CHUNK_Y_SIZE{
             for z in 0..CHUNK_AREA {
                 for x in 0..CHUNK_AREA {
 
-
                     let block = chunk.blocks[y][x][z];
-                    println!("adddin block vertices....{:?}", block);
-                    println!("--------------");
                     let mut block_vertices = Vec::with_capacity(4 * 6);
                     let mut block_indices = Vec::with_capacity(6 * 6);
-
-                    
-                    
 
                     if block.material_type as i32 == MaterialType::AIR as i32 {
                         continue;
                     }
 
-                    let mut visible = false;
-                    //let mut visible = true;
-
-
                     let mut quad_counter = 0;
                     for quad in block.quads.iter() {
-
-                        // block_vertices.extend_from_slice(&quad.vertices);
-                        // block_indices.extend_from_slice(&quad.get_indices(quad_counter));
-                        // quad_counter += 1;
-
+                        let mut visible = false;
                         let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-
 
                         if Chunk::pos_in_chunk_bounds(neighbour_pos) {
                             let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize];
-
                             if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
                                 visible = true;
                             }
