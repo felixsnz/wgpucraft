@@ -5,7 +5,7 @@ use crate::render::atlas::MaterialType;
 use super::{block::Block, LAND_LEVEL};
 
 pub const CHUNK_Y_SIZE:usize = 200;
-pub const CHUNK_AREA:usize =50;
+pub const CHUNK_AREA:usize =16;
 
 pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
 

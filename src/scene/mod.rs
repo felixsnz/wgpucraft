@@ -33,7 +33,7 @@ impl Scene {
 
         let globals_bind_group = renderer.bind_globals(&data);
 
-        let camera = Camera::new(&renderer, (0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let camera = Camera::new(&renderer, (5.0, 12.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
 
         let terrain = Terrain::new(
             &renderer,
