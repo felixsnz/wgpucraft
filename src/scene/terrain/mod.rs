@@ -2,7 +2,7 @@ pub mod block;
 pub mod chunk;
 use crate::render::{atlas::Atlas, mesh::Mesh, model::Model, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use self::chunk::Chunk;
+use self::chunk::{Chunk, generate_chunks};
 
 use wgpu::Error;
 
@@ -34,9 +34,8 @@ impl Terrain {                        ///
             &renderer.config
         );
         let mut mesh = Mesh::new();
-        for _ in 0..WORLD_SIZE {
-            let chunk = Chunk::new( [0,0,0]);
-            
+        for chunk in generate_chunks() {
+
             mesh.push_chunk(&chunk);
         }
 

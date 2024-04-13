@@ -63,4 +63,28 @@ impl Chunk {
         }
         return false;
     }
+
+    
+}
+
+
+pub fn generate_chunks() -> Vec<Chunk>{
+    let offsets = [
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 0, 1],
+        [1, 0, 1],
+
+    ];
+
+    let mut chunks = Vec::new();
+
+    for offset in offsets.iter() {
+        let chunk = Chunk::new(offset.map(|x| x as i32));
+        chunks.push(chunk);
+    }
+
+    chunks
+
+    // Aquí puedes hacer algo con los chunks, como añadirlos al mundo, actualizar un mapa, etc.
 }
