@@ -4,15 +4,16 @@ use crate::render::atlas::MaterialType;
 
 use super::{block::Block, LAND_LEVEL};
 
-pub const CHUNK_Y_SIZE:usize = 200;
+pub const CHUNK_Y_SIZE:usize = 100;
 pub const CHUNK_AREA:usize =16;
-
 pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
+pub const CHUNKS_VIEW:usize = 2;
 
 
 
 pub struct Chunk {
     pub blocks: Vec<Vec<Vec<Block>>>,
+    pub offset: [i32; 3]
 
 }
 
@@ -51,7 +52,7 @@ impl Chunk {
                 }
             }
         }
-        Self { blocks }
+        Self { blocks, offset}
     }
 
 
@@ -68,23 +69,16 @@ impl Chunk {
 }
 
 
-pub fn generate_chunks() -> Vec<Chunk>{
-    let offsets = [
-        [0, 0, 0],
-        [1, 0, 0],
-        [0, 0, 1],
-        [1, 0, 1],
-
-    ];
-
+pub fn generate_chunks(world_size: i32) -> Vec<Chunk> {
     let mut chunks = Vec::new();
-
-    for offset in offsets.iter() {
-        let chunk = Chunk::new(offset.map(|x| x as i32));
-        chunks.push(chunk);
+    for x in -world_size..=world_size {
+        for z in -world_size..=world_size{
+            let offset = [x, 0, z];
+            println!("offset: {:?}", offset);
+            let chunk = Chunk::new(offset);
+            chunks.push(chunk);
+        }
     }
-
+    //chunks.reverse();
     chunks
-
-    // Aquí puedes hacer algo con los chunks, como añadirlos al mundo, actualizar un mapa, etc.
 }

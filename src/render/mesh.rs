@@ -9,7 +9,7 @@ use super::{atlas::MaterialType, pipelines::terrain::BlockVertex, Vertex};
 /// Represents a vec-based mesh on the CPU
 pub struct Mesh<V: Vertex> {
     verts: Vec<V>,
-    indices: Vec<u16>
+    indices: Vec<u32>
 }
 
 impl<V: Vertex> Mesh<V>
@@ -27,18 +27,18 @@ impl<V: Vertex> Mesh<V>
     pub fn push(&mut self, vert: V) { self.verts.push(vert); }
 
     // new method to add indices
-    pub fn push_indices(&mut self, indices: &[u16]) {
+    pub fn push_indices(&mut self, indices: &[u32]) {
         self.indices.extend_from_slice(indices);
     }
 
     // returns the indices
-    pub fn indices(&self) -> &[u16] {
+    pub fn indices(&self) -> &[u32] {
         &self.indices
     }
 
     pub fn iter_verts(&self) -> std::slice::Iter<V> { self.verts.iter() }
 
-    pub fn iter_indices(&self) -> std::vec::IntoIter<u16> { self.indices.clone().into_iter() }
+    pub fn iter_indices(&self) -> std::vec::IntoIter<u32> { self.indices.clone().into_iter() }
 
     pub fn push_chunk(&mut self, chunk: &Chunk)
         where Vec<V>: Extend<BlockVertex>
@@ -49,7 +49,7 @@ impl<V: Vertex> Mesh<V>
 
                     let block = chunk.blocks[y][x][z];
                     let mut block_vertices = Vec::with_capacity(4 * 6);
-                    let mut block_indices = Vec::with_capacity(6 * 6);
+                    let mut block_indices: Vec<u32> = Vec::with_capacity(6 * 6);
 
                     if block.material_type as i32 == MaterialType::AIR as i32 {
                         continue;
@@ -77,7 +77,7 @@ impl<V: Vertex> Mesh<V>
                         }
                     }
                     
-                    block_indices = block_indices.iter().map(|i| i + self.verts.len() as u16).collect();
+                    block_indices = block_indices.iter().map(|i| i + self.verts.len() as u32).collect();
                     self.verts.extend(block_vertices);
                     self.indices.extend(block_indices);
                 }
