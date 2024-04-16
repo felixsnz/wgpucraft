@@ -1,3 +1,6 @@
+use std::io::StderrLock;
+
+use cgmath::{point3, InnerSpace, Vector3};
 use wgpu::BindGroup;
 use winit::event::WindowEvent;
 
@@ -16,6 +19,7 @@ pub struct Scene {
     pub globals_bind_group: BindGroup,
     pub camera: Camera,
     pub terrain: Terrain,
+    pub last_player_pos: cgmath::Point3<f32>
 }
 
 impl Scene {
@@ -33,7 +37,7 @@ impl Scene {
 
         let globals_bind_group = renderer.bind_globals(&data);
 
-        let camera = Camera::new(&renderer, (5.0, 12.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let camera = Camera::new(&renderer, (8.0, 12.0, 8.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
 
         let terrain = Terrain::new(
             &renderer,
@@ -48,6 +52,7 @@ impl Scene {
             globals_bind_group,
             camera,
             terrain,
+            last_player_pos: point3(0.0, 0.0, 0.0)
 
     
         }
@@ -60,6 +65,17 @@ impl Scene {
         dt: std::time::Duration
 
     ) {
+
+        //println!("camera pos: {:?}", self.camera.position);
+
+
+        //
+
+        let asd = self.last_player_pos - self.camera.position;
+        if asd.magnitude() > 8.0 {
+            self.last_player_pos = self.camera.position;
+            self.terrain.update(renderer, &self.camera);
+        }
 
         self.camera.update_dependants(dt);
 
