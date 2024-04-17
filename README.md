@@ -16,6 +16,11 @@ https://github.com/jdah/minecraft-weekend
 
 Because i'm too cool for that, i like to struggle, and that keeps my mind busy, so i decided that a making game from scratch with a pure graphics library will be a great pain to experience.
 
+
+## Current state
+
+right now im working in a proper chunk generation system
+
 ## Notes
 
 This repository could be said to be an evolution of this one:
