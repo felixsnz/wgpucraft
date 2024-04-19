@@ -4,18 +4,19 @@ use crate::render::{atlas::Atlas, mesh::Mesh, model::Model, pipelines::terrain::
 use crate::render::pipelines::GlobalsLayouts;
 use self::chunk::{generate_chunks, Chunk};
 
+use cgmath::{Point3, MetricSpace};
 use wgpu::Error;
 
 use super::camera::Camera;
 
 pub const LAND_LEVEL: usize = 9;
-pub const WORLD_SIZE: usize = 2; //chunks around
+pub const WORLD_SIZE: usize = 5; //chunks around
 
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
     chunks: Vec<Chunk>,
-    model: Model<BlockVertex>, // the world temporarily has only one block model, for debug purposes
+    model: Model<BlockVertex>,
 
 }
 
@@ -59,6 +60,29 @@ impl Terrain {                        ///
     }
 
 
+    pub fn update(&mut self, renderer: &Renderer, camera: &Camera) {
+
+
+        let mut mesh = Mesh::new();
+
+
+        for chunk in &self.chunks {
+
+            let chunk_pos = Point3::new((chunk.offset[0] * 16) as f32, 0.0, (chunk.offset[2] * 16) as f32);
+            let camera_pos = Point3::new(camera.position.x, 0.0, camera.position.z);
+
+            let dist = Point3::distance(chunk_pos, camera_pos);
+
+            if dist <= 32.0 {
+                mesh.push_chunk(chunk)
+            }
+        }
+
+
+        let new_model = Model::new(&renderer.device, &mesh).unwrap();
+
+        self.model = new_model
+    }
 }
 
 
