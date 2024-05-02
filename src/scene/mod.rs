@@ -71,11 +71,9 @@ impl Scene {
 
         //
 
-        let asd = self.last_player_pos - self.camera.position;
-        if asd.magnitude() > 8.0 {
-            self.last_player_pos = self.camera.position;
-            self.terrain.update(renderer, &self.camera);
-        }
+
+        self.terrain.update(renderer, &self.camera);
+        
 
         self.camera.update_dependants(dt);
 

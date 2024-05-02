@@ -18,6 +18,20 @@ impl<V: Vertex> Mesh<V>
     /// Create a new `Mesh`.
     pub fn new() -> Self { Self { verts: Vec::new(), indices: Vec::new() } }
 
+    pub fn from(chunk: &Chunk) -> Option<Self>
+        where Vec<V>: Extend<BlockVertex>
+    {
+
+        let mut mesh = Self::new();
+        // Example condition: return None if the chunk has no blocks
+        if chunk.blocks.iter().flat_map(|y| y.iter()).flat_map(|x| x.iter()).all(|b| b.lock().unwrap().material_type == MaterialType::AIR) {
+            None
+        } else {
+            mesh.push_chunk(chunk);
+            Some(mesh)
+        }
+    }
+
     /// Clear vertices, allows reusing allocated memory of the underlying Vec.
     pub fn clear(&mut self) { self.verts.clear(); }
 
@@ -47,7 +61,7 @@ impl<V: Vertex> Mesh<V>
             for z in 0..CHUNK_AREA {
                 for x in 0..CHUNK_AREA {
 
-                    let block = chunk.blocks[y][x][z];
+                    let block = chunk.blocks[y][x][z].lock().unwrap();
                     let mut block_vertices = Vec::with_capacity(4 * 6);
                     let mut block_indices: Vec<u32> = Vec::with_capacity(6 * 6);
 
@@ -61,7 +75,7 @@ impl<V: Vertex> Mesh<V>
                         let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
 
                         if Chunk::pos_in_chunk_bounds(neighbour_pos) {
-                            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize];
+                            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
                             if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
                                 visible = true;
                             }

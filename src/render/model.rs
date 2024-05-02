@@ -1,6 +1,6 @@
 use crate::render::{buffer::Buffer, mesh::Mesh};
 
-use super::Vertex;
+use super::{buffer::DynamicBuffer, Vertex};
 /// Represents a mesh that has been sent to the GPU.
 pub struct Model<V: Vertex>{
     vbuf: Buffer<V>,
@@ -23,8 +23,38 @@ impl<V: Vertex> Model<V>{
             num_indices: mesh.indices().len() as u32,
         })
     }
+
+    
     pub fn vbuf(&self) -> &wgpu::Buffer { &self.vbuf.buff }
     pub fn ibuf(&self) -> &wgpu::Buffer { &self.ibuf.buff }
     pub fn len(&self) -> u32 { self.vbuf.len() as u32}
+}
+
+
+/// Represents a mesh that has been sent to the GPU.
+pub struct DynamicModel<V: Vertex> {
+    vbuf: DynamicBuffer<V>,
+    ibuf: DynamicBuffer<u32>,
+    pub num_indices: u32,
+}
+
+impl<V: Vertex> DynamicModel<V> {
+    pub fn new(device: &wgpu::Device, size: usize) -> Self {
+        Self {
+            vbuf: DynamicBuffer::new(device, size, wgpu::BufferUsages::VERTEX),
+            ibuf: DynamicBuffer::new(device,  size, wgpu::BufferUsages::INDEX),
+            num_indices: 0,
+        }
+    }
+
+    pub fn update(&self, queue: &wgpu::Queue, mesh: &Mesh<V>, offset: usize) {
+        self.vbuf.update(queue, mesh.vertices(), offset)
+    }
+
+    pub fn vbuf(&self) -> &wgpu::Buffer { &self.vbuf.buff }
+    pub fn ibuf(&self) -> &wgpu::Buffer { &self.ibuf.buff }
+
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize { self.vbuf.len() }
 }
 
