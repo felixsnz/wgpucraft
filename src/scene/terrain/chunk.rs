@@ -14,6 +14,7 @@ pub const CHUNKS_VIEW:usize = 2;
 
 pub type Blocks = Vec<Vec<Vec<Arc<Mutex<Block>>>>>;
 
+#[derive(Default)]
 pub struct Chunk {
     pub blocks: Blocks,
     pub offset: [i32; 3]
@@ -77,53 +78,21 @@ impl Chunk {
 }
 
 
-pub fn generate_chunks(world_size: i32) -> Vec<Arc<Mutex<Chunk>>> {
-    let mut chunks = Vec::new();
-    for x in -world_size..=world_size {
-        for z in -world_size..=world_size{
-            let offset = [x, 0, z];
-            //println!("offset: {:?}", offset);
-            let chunk = Arc::new(Mutex::new(Chunk::new(offset)));
-            chunks.push(chunk);
-        }
-    }
-    //chunks.reverse();
-    chunks
-}
-
-
-// pub fn generate_chunk_w_seed(blocks: &mut Blocks, offset: [i32; 3], seed: u32, flat_world: bool) {
-//     if flat_world {
-//         generate_flat_world(blocks, offset);
-//         return;
+// pub fn generate_chunks(world_size: i32) -> Vec<Arc<Mutex<Chunk>>> {
+//     let mut chunks = Vec::new();
+//     for x in -world_size..=world_size {
+//         for z in -world_size..=world_size{
+//             let offset = [x, 0, z];
+//             //println!("offset: {:?}", offset);
+//             let chunk = Arc::new(Mutex::new(Chunk::new(offset)));
+//             chunks.push(chunk);
+//         }
 //     }
-
-//     let noise_map = get_noise_map(offset, seed);
-//     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {
-//         let z = i / (CHUNK_X_SIZE * CHUNK_Y_SIZE);
-//         let y = (i - z * CHUNK_X_SIZE * CHUNK_Y_SIZE) / CHUNK_X_SIZE;
-//         let x = i - CHUNK_X_SIZE * (y + CHUNK_Y_SIZE * z);
-
-//         let noise_height = noise_map.get_value(x, z);
-//         let new_height = normalize_noise(noise_height);
-
-//         let block_type = if y > new_height {
-//             if y <= SEA_LEVEL {
-//                 BlockType::WATER
-//             } else {
-//                 BlockType::AIR
-//             }
-//         } else if y == new_height {
-//             BlockType::GRASS
-//         } else if y == 0 {
-//             BlockType::ROCK
-//         } else {
-//             BlockType::DIRT
-//         };
-
-//         blocks[y][x][z].lock().unwrap().update(block_type, offset);
-//     });
+//     //chunks.reverse();
+//     chunks
 // }
+
+
 
 pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3]) {
     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {

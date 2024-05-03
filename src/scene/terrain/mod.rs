@@ -4,9 +4,8 @@ use std::{collections::VecDeque, sync::{Arc, Mutex}};
 
 use crate::render::{atlas::Atlas, mesh::Mesh, model::{DynamicModel, Model}, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use self::chunk::{generate_chunk, generate_chunks, Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
+use self::chunk::{generate_chunk, Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
 
-use bevy_ecs::world::Mut;
 use cgmath::{EuclideanSpace, Vector3};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::Error;
@@ -20,7 +19,7 @@ pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
-    chunks: Vec<Arc<Mutex<Chunk>>>,
+    pub chunks: Vec<Arc<Mutex<Chunk>>>,
     chunk_indices: Arc<Mutex<[Option<usize>; CHUNKS_ARRAY_SIZE]>>,
     free_chunk_indices: Arc<Mutex<VecDeque<usize>>>,
     center_offset: Vector3<i32>,
@@ -31,39 +30,19 @@ pub struct Terrain {
 
 impl Terrain {                        ///
     pub fn new(renderer: &Renderer) -> Self {
-        
-
-        let shader = renderer.device.create_shader_module(
-            wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl")
-        );
 
         let global_layouts = GlobalsLayouts::new(&renderer.device);
+
+        
         let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
-        let terrain_pipeline = TerrainPipeline::new(
-            &renderer.device, 
-            &global_layouts,
-            shader,
-            &renderer.config
-        );
-        let mut mesh = Mesh::new();
-
         let mut chunk_models = vec![];
-        let mut chunks = generate_chunks(CHUNKS_VIEW_SIZE as i32);
-
-        for chunk in &chunks {
-            //println!("chunk offset: {:?}", chunk.offset);
-            
-            mesh.push_chunk(&chunk.lock().unwrap());
-            
-        }
-
+        let mut chunks: Vec<Arc<Mutex<Chunk>>> = Vec::new();
         let chunk_indices: [Option<usize>; CHUNKS_ARRAY_SIZE] = [None; CHUNKS_ARRAY_SIZE];
         let mut free_chunk_indices = VecDeque::new();
 
-        let center_offset = Vector3::new(0, 0, 0);
-        let chunks_origin = center_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
 
-        for x in 0..CHUNKS_VIEW_SIZE {
+
+        for x in 0..CHUNKS_ARRAY_SIZE {
 
             chunks.push(Arc::new(Mutex::new(Chunk::new([0, 0, 0]))));
 
@@ -75,6 +54,23 @@ impl Terrain {                        ///
                 free_chunk_indices.push_back(x);
             }
         }
+
+        let shader = renderer.device.create_shader_module(
+            wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl")
+        );
+
+        
+
+        let terrain_pipeline = TerrainPipeline::new(
+            &renderer.device, 
+            &global_layouts,
+            shader,
+            &renderer.config
+        );
+
+        let center_offset = Vector3::new(0, 0, 0);
+        let chunks_origin = center_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
+
 
         
 
@@ -107,14 +103,16 @@ impl Terrain {                        ///
                         panic!("Error: Cannot load chunk")
                     }
 
-                    self.chunks.get(new_index).unwrap().lock().unwrap().offset = chunk_offset.into();
+                    self.chunks[new_index].lock().unwrap().offset = chunk_offset.into();
 
                     generate_chunk( 
-                        &mut self.chunks.get(new_index).unwrap().lock().unwrap().blocks,
+                        &mut self.chunks[new_index].lock().unwrap().blocks,
                         chunk_offset.into(),
                         //self.world_seed,
                         //self.config.flat_world,
                     );
+
+                    
 
                     // let mesh = self.compute_mesh(&self.chunks.blocks_array[new_index].lock().unwrap());
                     // *self.chunks.mesh_array[new_index].lock().unwrap() = mesh;
@@ -191,9 +189,6 @@ impl Terrain {                        ///
         }
 
         self.load_empty_chunks(&renderer.queue);
-
-
-
     }
 }
 
