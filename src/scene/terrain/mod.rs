@@ -13,7 +13,7 @@ use wgpu::Error;
 use super::camera::Camera;
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 5; //chunks around
+pub const CHUNKS_VIEW_SIZE: usize = 10; //chunks around
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 pub struct Terrain {
@@ -33,22 +33,18 @@ impl Terrain {                        ///
 
         let global_layouts = GlobalsLayouts::new(&renderer.device);
 
-        
         let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
         let mut chunk_models = vec![];
         let mut chunks: Vec<Arc<Mutex<Chunk>>> = Vec::new();
         let chunk_indices: [Option<usize>; CHUNKS_ARRAY_SIZE] = [None; CHUNKS_ARRAY_SIZE];
         let mut free_chunk_indices = VecDeque::new();
 
-
-
         for x in 0..CHUNKS_ARRAY_SIZE {
-
+            //println!("initial x from new terrain: {:?}", x);
             chunks.push(Arc::new(Mutex::new(Chunk::new([0, 0, 0]))));
-
             if let Some(mesh) = Mesh::from(&chunks.last().unwrap().lock().unwrap()) {
                 let mesh = mesh.clone();
-                let chunk_model = DynamicModel::new(&renderer.device, (CHUNK_AREA ^ 2) * CHUNK_Y_SIZE * 24);
+                let mut chunk_model = DynamicModel::new(&renderer.device, (CHUNK_AREA ^ 2) * CHUNK_Y_SIZE * 24);
                 chunk_model.update(&renderer.queue, &mesh, 0);
                 chunk_models.push(chunk_model);
                 free_chunk_indices.push_back(x);
@@ -58,8 +54,6 @@ impl Terrain {                        ///
         let shader = renderer.device.create_shader_module(
             wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl")
         );
-
-        
 
         let terrain_pipeline = TerrainPipeline::new(
             &renderer.device, 
@@ -94,6 +88,7 @@ impl Terrain {                        ///
 
     pub fn load_empty_chunks(&mut self, queue: &wgpu::Queue) {
         (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
+            //println!("initial indice from load empty chunks: {:?}", i);
             let chunk_index = self.chunk_indices.lock().unwrap()[i].clone();
             if let None = chunk_index {
                 let new_index = self.free_chunk_indices.lock().unwrap().pop_front().clone();
@@ -125,9 +120,8 @@ impl Terrain {                        ///
         });
 
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
-            let mut mesh = Mesh::new();
-            mesh.push_chunk(&self.chunks.get(i).unwrap().lock().unwrap());
-            self.chunk_models[i].update(queue, &mesh, 0);
+            let mesh = Mesh::from(&self.chunks.get(i).unwrap().lock().unwrap());
+            self.chunk_models[i].update(queue, &mesh.unwrap(), 0);
         });
     }
 
@@ -164,6 +158,8 @@ impl Terrain {                        ///
         let new_chunk_offset = Self::world_pos_to_chunk_offset(camera.position.to_vec());
         let new_chunk_origin = new_chunk_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
 
+        // println!("new_chunk_offset: {:?}", new_chunk_offset);
+        // println!("new_chunk_origin: {:?}", new_chunk_origin);
         if new_chunk_origin == self.chunks_origin {
             return;
         }
@@ -172,6 +168,8 @@ impl Terrain {                        ///
         self.chunks_origin = new_chunk_origin;
 
         let chunk_indices_copy = self.chunk_indices.lock().unwrap().clone();
+
+        //println!("chunk_indices_copy: {:?}", chunk_indices_copy);
         self.chunk_indices = Arc::new(Mutex::new([None; CHUNKS_ARRAY_SIZE]));
         for i in 0..CHUNKS_ARRAY_SIZE {
             match chunk_indices_copy[i] {
@@ -179,8 +177,10 @@ impl Terrain {                        ///
                     let chunk_offset = self.chunks.get(chunk_index).unwrap().lock().unwrap().offset.clone();
                     if self.chunk_in_bounds(chunk_offset.into()) {
                         let new_chunk_world_index = self.get_chunk_world_index(chunk_offset.into());
+                        //println!("new chunk world index: {:?}", new_chunk_world_index);
                         self.chunk_indices.lock().unwrap()[new_chunk_world_index] = Some(chunk_index);
                     } else {
+                        //print!("bad chunk indice, not in bounds");
                         self.free_chunk_indices.lock().unwrap().push_back(chunk_index);
                     }
                 }
@@ -196,11 +196,12 @@ impl Terrain {                        ///
 impl Draw for Terrain {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, globals: &'a wgpu::BindGroup) -> Result<(), Error> {
 
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
-            render_pass.set_bind_group(1, &globals, &[]);
+
 
             for chunk_model in &self.chunk_models {
+                render_pass.set_pipeline(&self.pipeline);
+                render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
+                render_pass.set_bind_group(1, &globals, &[]);
                 render_pass.set_vertex_buffer(0, chunk_model.vbuf().slice(..));
                 render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint32);
                 render_pass.draw_indexed(0..chunk_model.num_indices, 0, 0..1 as _);

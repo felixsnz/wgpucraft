@@ -47,8 +47,10 @@ impl<V: Vertex> DynamicModel<V> {
         }
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, mesh: &Mesh<V>, offset: usize) {
-        self.vbuf.update(queue, mesh.vertices(), offset)
+    pub fn update(&mut self, queue: &wgpu::Queue, mesh: &Mesh<V>, offset: usize) {
+        self.vbuf.update(queue, mesh.vertices(), offset);
+        self.ibuf.update(queue, mesh.indices(), offset);
+        self.num_indices = mesh.vertices().len() as u32;
     }
 
     pub fn vbuf(&self) -> &wgpu::Buffer { &self.vbuf.buff }
