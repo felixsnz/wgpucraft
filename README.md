@@ -14,15 +14,32 @@ https://github.com/jdah/minecraft-weekend
 
 ## why not using a game engine?
 
-Because i'm too cool for that, i like to struggle, and that keeps my mind busy, so i decided that a making game from scratch with a pure graphics library will be a great pain to experience.
+Because i'm too cool for that, i like to struggle, and that keeps my mind busy, so i decided that a making game from scratch using a pure graphics library would be a great pain to experience.
+
+## Screenshots
+![Gameplay](./screenshots/1.png)
 
 
-## Current state
 
-right now im working in a proper chunk generation system
+## Roadmap
 
-## Notes
+### What has been done ?
 
-This repository could be said to be an evolution of this one:
-https://github.com/xanfe/rust-graphics  
-that is where I experimented with wgpu code, but as I began to introduce voxel features, I decided that it would be better to create another repository exclusively for that (this one), even this repo could be leaved behind to create a more specific one if evolves enough.
+* atlas texture
+* block rendering
+* face culling (only visible block faces are rendered)
+* fps controller 
+* basic chunk generation
+
+### Work in progress...
+
+* optimize chunk system (right now is very laggy)
+* chunk culling (similar to face culling but considering chunk neighbors)
+* terrain generation based on noise map 
+
+### future features
+
+* greddy mesh algorithm
+* block manipulation
+* ECS (Entity Component System)
+* HUD elements
