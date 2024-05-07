@@ -72,7 +72,7 @@ impl Scene {
         //
 
 
-        self.terrain.update(renderer, &self.camera);
+        self.terrain.update(&renderer.queue, &self.camera.position);
         
 
         self.camera.update_dependants(dt);

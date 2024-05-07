@@ -2,18 +2,16 @@ pub mod block;
 pub mod chunk;
 use std::{collections::VecDeque, sync::{Arc, Mutex}};
 
-use crate::render::{atlas::Atlas, mesh::Mesh, model::{DynamicModel, Model}, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
+use crate::render::{atlas::Atlas, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
 use self::chunk::{generate_chunk, Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
 
-use cgmath::{EuclideanSpace, Vector3};
+use cgmath::{EuclideanSpace, Point3, Vector3};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use wgpu::Error;
-
-use super::camera::Camera;
+use wgpu::{Error, Queue};
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 10; //chunks around
+pub const CHUNKS_VIEW_SIZE: usize = 3;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 pub struct Terrain {
@@ -28,11 +26,9 @@ pub struct Terrain {
 
 }
 
-impl Terrain {                        ///
+impl Terrain {
     pub fn new(renderer: &Renderer) -> Self {
-
         let global_layouts = GlobalsLayouts::new(&renderer.device);
-
         let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
         let mut chunk_models = vec![];
         let mut chunks: Vec<Arc<Mutex<Chunk>>> = Vec::new();
@@ -65,10 +61,6 @@ impl Terrain {                        ///
         let center_offset = Vector3::new(0, 0, 0);
         let chunks_origin = center_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
 
-
-        
-
-
         let mut terrain = Self {
             pipeline: terrain_pipeline.pipeline,
             atlas,
@@ -78,7 +70,6 @@ impl Terrain {                        ///
             chunks_origin,
             chunk_indices: Arc::new(Mutex::new(chunk_indices)),
             free_chunk_indices: Arc::new(Mutex::new(free_chunk_indices))
-
         };
 
         terrain.load_empty_chunks(&renderer.queue);
@@ -86,9 +77,9 @@ impl Terrain {                        ///
         terrain
     }
 
-    pub fn load_empty_chunks(&mut self, queue: &wgpu::Queue) {
+    pub fn load_empty_chunks(&mut self, queue: &Queue) {
+
         (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
-            //println!("initial indice from load empty chunks: {:?}", i);
             let chunk_index = self.chunk_indices.lock().unwrap()[i].clone();
             if let None = chunk_index {
                 let new_index = self.free_chunk_indices.lock().unwrap().pop_front().clone();
@@ -103,14 +94,7 @@ impl Terrain {                        ///
                     generate_chunk( 
                         &mut self.chunks[new_index].lock().unwrap().blocks,
                         chunk_offset.into(),
-                        //self.world_seed,
-                        //self.config.flat_world,
                     );
-
-                    
-
-                    // let mesh = self.compute_mesh(&self.chunks.blocks_array[new_index].lock().unwrap());
-                    // *self.chunks.mesh_array[new_index].lock().unwrap() = mesh;
 
                     self.chunk_indices.lock().unwrap()[i] = Some(new_index);
                 } else {
@@ -125,7 +109,7 @@ impl Terrain {                        ///
         });
     }
 
-        // world array index -> chunk offset
+    // world array index -> chunk offset
     fn get_chunk_offset(&self, i: usize) -> Vector3<i32> {
         return self.chunks_origin + Vector3::new(i as i32 % CHUNKS_VIEW_SIZE as i32, 0, i as i32 / CHUNKS_VIEW_SIZE as i32);
     }
@@ -153,23 +137,21 @@ impl Terrain {                        ///
     }
 
 
-    pub fn update(&mut self, renderer: &Renderer, camera: &Camera) {
+    //called every frame
+    pub fn update(&mut self, queue: &Queue, player_position: &Point3<f32>) {
 
-        let new_chunk_offset = Self::world_pos_to_chunk_offset(camera.position.to_vec());
-        let new_chunk_origin = new_chunk_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
+        let new_center_offset = Self::world_pos_to_chunk_offset(player_position.to_vec());
+        let new_chunk_origin = new_center_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
 
-        // println!("new_chunk_offset: {:?}", new_chunk_offset);
-        // println!("new_chunk_origin: {:?}", new_chunk_origin);
         if new_chunk_origin == self.chunks_origin {
             return;
         }
 
-        self.center_offset = new_chunk_offset;
+        self.center_offset = new_center_offset;
         self.chunks_origin = new_chunk_origin;
 
         let chunk_indices_copy = self.chunk_indices.lock().unwrap().clone();
 
-        //println!("chunk_indices_copy: {:?}", chunk_indices_copy);
         self.chunk_indices = Arc::new(Mutex::new([None; CHUNKS_ARRAY_SIZE]));
         for i in 0..CHUNKS_ARRAY_SIZE {
             match chunk_indices_copy[i] {
@@ -177,10 +159,8 @@ impl Terrain {                        ///
                     let chunk_offset = self.chunks.get(chunk_index).unwrap().lock().unwrap().offset.clone();
                     if self.chunk_in_bounds(chunk_offset.into()) {
                         let new_chunk_world_index = self.get_chunk_world_index(chunk_offset.into());
-                        //println!("new chunk world index: {:?}", new_chunk_world_index);
                         self.chunk_indices.lock().unwrap()[new_chunk_world_index] = Some(chunk_index);
                     } else {
-                        //print!("bad chunk indice, not in bounds");
                         self.free_chunk_indices.lock().unwrap().push_back(chunk_index);
                     }
                 }
@@ -188,27 +168,23 @@ impl Terrain {                        ///
             }
         }
 
-        self.load_empty_chunks(&renderer.queue);
+        self.load_empty_chunks(queue);
     }
+
 }
 
 
 impl Draw for Terrain {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, globals: &'a wgpu::BindGroup) -> Result<(), Error> {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
+        render_pass.set_bind_group(1, &globals, &[]);
+        for chunk_model in &self.chunk_models {
 
-
-
-            for chunk_model in &self.chunk_models {
-                render_pass.set_pipeline(&self.pipeline);
-                render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
-                render_pass.set_bind_group(1, &globals, &[]);
-                render_pass.set_vertex_buffer(0, chunk_model.vbuf().slice(..));
-                render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.draw_indexed(0..chunk_model.num_indices, 0, 0..1 as _);
-            }
-            
-        
-
+            render_pass.set_vertex_buffer(0, chunk_model.vbuf().slice(..));
+            render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..chunk_model.num_indices, 0, 0..1 as _);
+        }
         Ok(())
     }
 }
