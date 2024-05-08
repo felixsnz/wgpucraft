@@ -10,14 +10,15 @@ use super::{block::Block, LAND_LEVEL};
 pub const CHUNK_Y_SIZE:usize = 100;
 pub const CHUNK_AREA:usize =16;
 pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
-pub const CHUNKS_VIEW:usize = 2;
+pub const CHUNKS_VIEW:usize = 3;
 
 pub type Blocks = Vec<Vec<Vec<Arc<Mutex<Block>>>>>;
 
 #[derive(Default)]
 pub struct Chunk {
     pub blocks: Blocks,
-    pub offset: [i32; 3]
+    pub offset: [i32; 3],
+    pub updated: bool
 
 }
 
@@ -61,7 +62,7 @@ impl Chunk {
                 }
             }
         }
-        Self { blocks, offset}
+        Self { updated: true, blocks, offset}
     }
 
 
@@ -76,23 +77,6 @@ impl Chunk {
 
     
 }
-
-
-// pub fn generate_chunks(world_size: i32) -> Vec<Arc<Mutex<Chunk>>> {
-//     let mut chunks = Vec::new();
-//     for x in -world_size..=world_size {
-//         for z in -world_size..=world_size{
-//             let offset = [x, 0, z];
-//             //println!("offset: {:?}", offset);
-//             let chunk = Arc::new(Mutex::new(Chunk::new(offset)));
-//             chunks.push(chunk);
-//         }
-//     }
-//     //chunks.reverse();
-//     chunks
-// }
-
-
 
 pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3]) {
     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {

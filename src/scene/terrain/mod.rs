@@ -11,7 +11,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::{Error, Queue};
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 3;
+pub const CHUNKS_VIEW_SIZE: usize = 8;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 pub struct Terrain {
@@ -96,6 +96,8 @@ impl Terrain {
                         chunk_offset.into(),
                     );
 
+                    //self.chunks[new_index].lock().unwrap().updated = true;
+
                     self.chunk_indices.lock().unwrap()[i] = Some(new_index);
                 } else {
                     panic!("Error: No free space for chunk")
@@ -104,9 +106,16 @@ impl Terrain {
         });
 
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
-            let mesh = Mesh::from(&self.chunks.get(i).unwrap().lock().unwrap());
-            self.chunk_models[i].update(queue, &mesh.unwrap(), 0);
+            let mut chunk = self.chunks.get(i).unwrap().lock().unwrap();
+            if chunk.updated {
+                println!("asdadd updating chunk data");
+                let mesh = Mesh::from(&*chunk);
+                self.chunk_models[i].update(queue, &mesh.unwrap(), 0);
+                chunk.updated = false; // Resetear el marcador una vez actualizado
+            }
         });
+
+        println!("---------------------------------");
     }
 
     // world array index -> chunk offset
@@ -160,8 +169,11 @@ impl Terrain {
                     if self.chunk_in_bounds(chunk_offset.into()) {
                         let new_chunk_world_index = self.get_chunk_world_index(chunk_offset.into());
                         self.chunk_indices.lock().unwrap()[new_chunk_world_index] = Some(chunk_index);
+                        self.chunks[chunk_index].lock().unwrap().updated = false; // Marcar como actualizado
+                        
                     } else {
                         self.free_chunk_indices.lock().unwrap().push_back(chunk_index);
+                        self.chunks[chunk_index].lock().unwrap().updated = true; // Marcar como actualizado
                     }
                 }
                 None => {}
