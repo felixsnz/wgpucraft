@@ -7,6 +7,8 @@ use std::f32::consts::FRAC_PI_2;
 
 use crate::render::renderer::Renderer;
 
+use super::terrain::{chunk::CHUNK_Y_SIZE, CHUNKS_VIEW_SIZE};
+
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -33,9 +35,6 @@ pub struct Camera {
     pub dependants: Dependants
 }
 
-const WORLD_SIZE: u16 = 10;
-const CHUNK_Z_SIZE:u16 = 16;
-
 impl Camera {
     pub fn new<V: Into<Point3<f32>>, Y: Into<Rad<f32>>, P: Into<Rad<f32>>>(renderer: &Renderer, position: V, yaw: Y, pitch: P) -> Self {
         let projection = Projection::new(
@@ -43,9 +42,9 @@ impl Camera {
             renderer.config.height,
             cgmath::Deg(45.0),
             0.1,
-            (WORLD_SIZE * CHUNK_Z_SIZE) as f32,
+            (CHUNKS_VIEW_SIZE * CHUNK_Y_SIZE as usize) as f32,
         );
-        let camera_controller = CameraController::new(2.0, 2.1);
+        let camera_controller = CameraController::new(10.0, 2.1);
 
         let mut camera = Self {
             position: position.into(),
