@@ -194,8 +194,8 @@ impl Draw for Terrain {
         for chunk_model in &self.chunk_models {
 
             render_pass.set_vertex_buffer(0, chunk_model.vbuf().slice(..));
-            render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.draw_indexed(0..chunk_model.num_indices, 0, 0..1 as _);
+            render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..chunk_model.num_indices as u32, 0, 0..1 as _);
         }
         Ok(())
     }
