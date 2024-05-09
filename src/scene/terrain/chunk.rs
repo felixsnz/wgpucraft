@@ -10,7 +10,6 @@ use super::{block::Block, LAND_LEVEL};
 pub const CHUNK_Y_SIZE:usize = 100;
 pub const CHUNK_AREA:usize =16;
 pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
-pub const CHUNKS_VIEW:usize = 3;
 
 pub type Blocks = Vec<Vec<Vec<Arc<Mutex<Block>>>>>;
 

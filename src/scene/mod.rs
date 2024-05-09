@@ -1,6 +1,4 @@
-use std::io::StderrLock;
-
-use cgmath::{point3, InnerSpace, Vector3};
+use cgmath::point3;
 use wgpu::BindGroup;
 use winit::event::WindowEvent;
 
