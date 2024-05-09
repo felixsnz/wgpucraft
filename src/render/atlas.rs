@@ -6,7 +6,7 @@ use crate::scene::terrain::block::*;
 use super::pipelines::GlobalsLayouts;
 
 #[allow(dead_code)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum MaterialType {
     DIRT,
     GRASS,
@@ -29,7 +29,7 @@ impl MaterialType {
             },
             MaterialType::DIRT => atlas_pos_to_coordinates([2.0, 0.0], texture_corner),
             MaterialType::ROCK => atlas_pos_to_coordinates([1.0, 0.0], texture_corner),
-            MaterialType::WATER => atlas_pos_to_coordinates([4.0, 0.0], texture_corner),
+            MaterialType::WATER => atlas_pos_to_coordinates([13.0, 0.0], texture_corner),
             MaterialType::AIR => [0.0, 0.0],
             MaterialType::DEBUG => atlas_pos_to_coordinates([15.0, 3.0], texture_corner),
         }
