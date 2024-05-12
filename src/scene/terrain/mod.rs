@@ -1,17 +1,18 @@
 pub mod block;
 pub mod chunk;
-use std::{collections::VecDeque, sync::{Arc, Mutex}};
+use std::{collections::VecDeque, sync::{Arc, Mutex}, thread};
 
-use crate::render::{atlas::Atlas, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
+use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
 use self::chunk::{generate_chunk, Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
 
 use cgmath::{EuclideanSpace, Point3, Vector3};
+use instant::Duration;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::{Error, Queue};
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 8;
+pub const CHUNKS_VIEW_SIZE: usize = 3;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 pub struct Terrain {
@@ -38,13 +39,12 @@ impl Terrain {
         for x in 0..CHUNKS_ARRAY_SIZE {
             //println!("initial x from new terrain: {:?}", x);
             chunks.push(Arc::new(Mutex::new(Chunk::new([0, 0, 0]))));
-            if let Some(mesh) = Mesh::from(&chunks.last().unwrap().lock().unwrap()) {
-                let mesh = mesh.clone();
-                let mut chunk_model = DynamicModel::new(&renderer.device, (CHUNK_AREA ^ 2) * CHUNK_Y_SIZE * 24);
-                chunk_model.update(&renderer.queue, &mesh, 0);
-                chunk_models.push(chunk_model);
-                free_chunk_indices.push_back(x);
-            }
+            let mesh = Mesh::new(); //empty mesh
+            let mut chunk_model = DynamicModel::new(&renderer.device, (CHUNK_AREA ^ 2) * CHUNK_Y_SIZE * 24);
+            chunk_model.update(&renderer.queue, &mesh, 0);
+            chunk_models.push(chunk_model);
+            free_chunk_indices.push_back(x);
+        
         }
 
         let shader = renderer.device.create_shader_module(
@@ -77,6 +77,7 @@ impl Terrain {
         terrain
     }
 
+
     pub fn load_empty_chunks(&mut self, queue: &Queue) {
 
         (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
@@ -96,8 +97,6 @@ impl Terrain {
                         chunk_offset.into(),
                     );
 
-                    //self.chunks[new_index].lock().unwrap().updated = true;
-
                     self.chunk_indices.lock().unwrap()[i] = Some(new_index);
                 } else {
                     panic!("Error: No free space for chunk")
@@ -108,15 +107,105 @@ impl Terrain {
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
             let mut chunk = self.chunks.get(i).unwrap().lock().unwrap();
             if chunk.updated {
-                println!("asdadd updating chunk data");
-                let mesh = Mesh::from(&*chunk);
-                self.chunk_models[i].update(queue, &mesh.unwrap(), 0);
-                chunk.updated = false; // Resetear el marcador una vez actualizado
+                let mesh = self.update_mesh(&chunk);
+                self.chunk_models[i].update(queue, &mesh, 0);
+                chunk.updated = false; 
             }
         });
 
         println!("---------------------------------");
     }
+
+    fn get_local_pos_in_neighbor(&self, world_pos: Vector3<i32>) -> Vector3<i32> {
+        let x = ((world_pos.x % CHUNK_AREA as i32) + CHUNK_AREA as i32) % CHUNK_AREA as i32;
+        let y = ((world_pos.y % CHUNK_Y_SIZE as i32) + CHUNK_Y_SIZE as i32) % CHUNK_Y_SIZE as i32;
+        let z = ((world_pos.z % CHUNK_AREA as i32) + CHUNK_AREA as i32) % CHUNK_AREA as i32;
+        Vector3::new(x, y, z)
+    }
+
+
+    fn get_chunk_by_world_position(&self, world_pos: Vector3<i32>) -> Option<Arc<Mutex<Chunk>>> {
+
+        if world_pos.y < 0 || world_pos.y >= CHUNK_Y_SIZE as i32 {
+            return None;
+        }
+        let index_x = (world_pos.x.div_euclid(CHUNK_AREA as i32) - self.chunks_origin.x);
+        let index_z = (world_pos.z.div_euclid(CHUNK_AREA as i32) - self.chunks_origin.z);
+
+        if index_x >= 0 && index_x < CHUNKS_VIEW_SIZE as i32 && index_z >= 0 && index_z < CHUNKS_VIEW_SIZE as i32 {
+            let index = (index_z * CHUNKS_VIEW_SIZE as i32 + index_x) as usize;
+            self.chunk_indices.lock().unwrap().get(index)
+                .and_then(|&idx| self.chunks.get(idx.unwrap()))
+                .map(Arc::clone)
+        } else {
+            None
+        }
+    }
+
+    pub fn update_mesh(&self, chunk: &Chunk) -> Mesh<BlockVertex>
+    {
+        let mut verts =Vec::new();
+        let mut indices = Vec::new();
+        for y in 0.. CHUNK_Y_SIZE{
+            for z in 0..CHUNK_AREA {
+                for x in 0..CHUNK_AREA {
+
+                    let block = chunk.blocks[y][x][z].lock().unwrap();
+                    let mut block_vertices = Vec::with_capacity(4 * 6);
+                    let mut block_indices: Vec<u16> = Vec::with_capacity(6 * 6);
+
+                    if block.material_type as i32 == MaterialType::AIR as i32 {
+                        continue;
+                    }
+
+                    let mut quad_counter = 0;
+                    for quad in block.quads.iter() {
+                        let mut visible = false;
+                        let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
+
+                        if Chunk::pos_in_chunk_bounds(neighbour_pos) {
+                            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
+                            if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
+                                visible = true;
+                            }
+
+                        } else {
+
+                            //handle check neighbor chunk visible blocks
+                            let world_pos = chunk.local_pos_to_world(neighbour_pos);
+                            if let Some(neighbour_chunk) = self.get_chunk_by_world_position(world_pos) {
+                                let neighbour_chunk = neighbour_chunk.lock().unwrap();
+                                let local_pos_in_neighbour = self.get_local_pos_in_neighbor(world_pos);
+                                let neighbour_block = neighbour_chunk.blocks[local_pos_in_neighbour.y as usize][local_pos_in_neighbour.x as usize][local_pos_in_neighbour.z as usize].lock().unwrap();
+                                if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
+                                    visible = true;
+                                }
+                            } else {
+                                // If the chunk doesn't exist, treat the block as visible
+                                visible = true;
+                                println!("Neighboring chunk does not exist for block at world position {:?}", world_pos);
+                            }
+                        }
+                        if visible {
+                            block_vertices.extend_from_slice(&quad.vertices);
+                            block_indices.extend_from_slice(&quad.get_indices(quad_counter));
+                            quad_counter += 1;
+                        }
+                    }
+                    block_indices = block_indices.iter().map(|i| i + verts.len() as u16).collect();
+                    verts.extend(block_vertices);
+                    indices.extend(block_indices);
+                }
+            }
+        }
+        Mesh {
+            verts,
+            indices,
+        }
+    }
+
+
+
 
     // world array index -> chunk offset
     fn get_chunk_offset(&self, i: usize) -> Vector3<i32> {

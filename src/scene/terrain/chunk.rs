@@ -64,6 +64,14 @@ impl Chunk {
         Self { updated: true, blocks, offset}
     }
 
+    pub fn local_pos_to_world(&self, local_pos: Vector3<i32>) -> Vector3<i32> {
+        Vector3::new( 
+            local_pos.x + self.offset[0] * CHUNK_AREA as i32,
+            local_pos.y + self.offset[1] * CHUNK_AREA as i32,
+            local_pos.z + self.offset[2] * CHUNK_AREA as i32
+        )
+    }
+
 
     pub fn pos_in_chunk_bounds(pos: Vector3<i32>) -> bool {
         if pos.x >= 0 && pos.y >= 0 && pos.z >= 0 {
