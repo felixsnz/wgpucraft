@@ -4,15 +4,15 @@ use std::{collections::VecDeque, sync::{Arc, Mutex}, thread};
 
 use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use self::chunk::{generate_chunk, Chunk, CHUNK_AREA, CHUNK_Y_SIZE};
+use self::{block::Block, chunk::{generate_chunk, Chunk, CHUNK_AREA, CHUNK_Y_SIZE}};
 
 use cgmath::{EuclideanSpace, Point3, Vector3};
 use instant::Duration;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 use wgpu::{Error, Queue};
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 3;
+pub const CHUNKS_VIEW_SIZE: usize = 15;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 pub struct Terrain {
@@ -107,7 +107,7 @@ impl Terrain {
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
             let mut chunk = self.chunks.get(i).unwrap().lock().unwrap();
             if chunk.updated {
-                let mesh = self.update_mesh(&chunk);
+                let mesh = self.update_mesh(&mut chunk);
                 self.chunk_models[i].update(queue, &mesh, 0);
                 chunk.updated = false; 
             }
@@ -142,50 +142,26 @@ impl Terrain {
         }
     }
 
-    pub fn update_mesh(&self, chunk: &Chunk) -> Mesh<BlockVertex>
-    {
+    pub fn update_mesh(&self, chunk: &mut Chunk) -> Mesh<BlockVertex> {
+
         let mut verts =Vec::new();
         let mut indices = Vec::new();
         for y in 0.. CHUNK_Y_SIZE{
             for z in 0..CHUNK_AREA {
                 for x in 0..CHUNK_AREA {
-
-                    let block = chunk.blocks[y][x][z].lock().unwrap();
+                    let block = chunk.blocks[y][x][z].lock().unwrap().clone();
                     let mut block_vertices = Vec::with_capacity(4 * 6);
                     let mut block_indices: Vec<u16> = Vec::with_capacity(6 * 6);
-
                     if block.material_type as i32 == MaterialType::AIR as i32 {
                         continue;
                     }
-
+            
                     let mut quad_counter = 0;
+            
                     for quad in block.quads.iter() {
-                        let mut visible = false;
                         let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-
-                        if Chunk::pos_in_chunk_bounds(neighbour_pos) {
-                            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
-                            if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
-                                visible = true;
-                            }
-
-                        } else {
-
-                            //handle check neighbor chunk visible blocks
-                            let world_pos = chunk.local_pos_to_world(neighbour_pos);
-                            if let Some(neighbour_chunk) = self.get_chunk_by_world_position(world_pos) {
-                                let neighbour_chunk = neighbour_chunk.lock().unwrap();
-                                let local_pos_in_neighbour = self.get_local_pos_in_neighbor(world_pos);
-                                let neighbour_block = neighbour_chunk.blocks[local_pos_in_neighbour.y as usize][local_pos_in_neighbour.x as usize][local_pos_in_neighbour.z as usize].lock().unwrap();
-                                if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
-                                    visible = true;
-                                }
-                            } else {
-                                // If the chunk doesn't exist, treat the block as visible
-                                visible = true;
-                                println!("Neighboring chunk does not exist for block at world position {:?}", world_pos);
-                            }
-                        }
+                        let visible = self.determine_visibility(&neighbour_pos, chunk);
+            
                         if visible {
                             block_vertices.extend_from_slice(&quad.vertices);
                             block_indices.extend_from_slice(&quad.get_indices(quad_counter));
@@ -198,12 +174,30 @@ impl Terrain {
                 }
             }
         }
-        Mesh {
-            verts,
-            indices,
+
+        Mesh { verts, indices }
+    }
+    
+    /// Helper function to check visibility of a block
+    fn determine_visibility(&self, neighbour_pos: &Vector3<i32>,chunk: &mut Chunk) -> bool {
+        if Chunk::pos_in_chunk_bounds(*neighbour_pos) {
+            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
+            return neighbour_block.material_type as u16 == MaterialType::AIR as u16;
+        } else {
+            let world_pos = chunk.local_pos_to_world(*neighbour_pos);
+            chunk.updated = true;
+            //println!("world pos {:?}", world_pos);
+            if let Some(neighbour_chunk) = self.get_chunk_by_world_position(world_pos) {
+                let neighbour_chunk = neighbour_chunk.lock().unwrap();
+                let local_pos_in_neighbour = self.get_local_pos_in_neighbor(world_pos);
+                let neighbour_block = neighbour_chunk.blocks[local_pos_in_neighbour.y as usize][local_pos_in_neighbour.x as usize][local_pos_in_neighbour.z as usize].lock().unwrap();
+                return neighbour_block.material_type as u16 == MaterialType::AIR as u16;
+            } else {
+                return true; // If the chunk doesn't exist, treat the block as visible
+            }
         }
     }
-
+    
 
 
 
