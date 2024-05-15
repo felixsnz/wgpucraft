@@ -1,65 +1,75 @@
 pub mod block;
 pub mod chunk;
-use std::{collections::VecDeque, sync::{Arc, Mutex}, thread};
+use std::{collections::VecDeque, sync::{Arc, RwLock}};
+
 
 use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use self::{block::Block, chunk::{generate_chunk, Chunk, CHUNK_AREA, CHUNK_Y_SIZE}};
+use self::chunk::{generate_chunk, Blocks, ChunkArray, CHUNK_AREA, CHUNK_Y_SIZE};
+
 
 use cgmath::{EuclideanSpace, Point3, Vector3};
-use instant::Duration;
-use rayon::iter::{IntoParallelIterator, ParallelBridge, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::{Error, Queue};
 
+
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 15;
+pub const CHUNKS_VIEW_SIZE: usize = 16;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
+
 
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
-    pub chunks: Vec<Arc<Mutex<Chunk>>>,
-    chunk_indices: Arc<Mutex<[Option<usize>; CHUNKS_ARRAY_SIZE]>>,
-    free_chunk_indices: Arc<Mutex<VecDeque<usize>>>,
+    pub chunks: ChunkArray,
+    chunk_indices: Arc<RwLock<[Option<usize>; CHUNKS_ARRAY_SIZE]>>,
+    free_chunk_indices: Arc<RwLock<VecDeque<usize>>>,
     center_offset: Vector3<i32>,
     chunks_origin: Vector3<i32>,
     chunk_models: Vec<DynamicModel<BlockVertex>>
 
+
 }
+
 
 impl Terrain {
     pub fn new(renderer: &Renderer) -> Self {
         let global_layouts = GlobalsLayouts::new(&renderer.device);
         let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
         let mut chunk_models = vec![];
-        let mut chunks: Vec<Arc<Mutex<Chunk>>> = Vec::new();
+        let mut chunks:ChunkArray = ChunkArray::default();
         let chunk_indices: [Option<usize>; CHUNKS_ARRAY_SIZE] = [None; CHUNKS_ARRAY_SIZE];
         let mut free_chunk_indices = VecDeque::new();
 
+
         for x in 0..CHUNKS_ARRAY_SIZE {
             //println!("initial x from new terrain: {:?}", x);
-            chunks.push(Arc::new(Mutex::new(Chunk::new([0, 0, 0]))));
-            let mesh = Mesh::new(); //empty mesh
+            chunks.new_chunk([0,0,0]);
             let mut chunk_model = DynamicModel::new(&renderer.device, (CHUNK_AREA ^ 2) * CHUNK_Y_SIZE * 24);
-            chunk_model.update(&renderer.queue, &mesh, 0);
+            chunk_model.update(&renderer.queue, &chunks.mesh_array[x].read().unwrap(), 0);
             chunk_models.push(chunk_model);
             free_chunk_indices.push_back(x);
-        
+
+
         }
+
 
         let shader = renderer.device.create_shader_module(
             wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl")
         );
 
+
         let terrain_pipeline = TerrainPipeline::new(
-            &renderer.device, 
+            &renderer.device,
             &global_layouts,
             shader,
             &renderer.config
         );
 
+
         let center_offset = Vector3::new(0, 0, 0);
         let chunks_origin = center_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
+
 
         let mut terrain = Self {
             pipeline: terrain_pipeline.pipeline,
@@ -68,100 +78,134 @@ impl Terrain {
             chunk_models,
             center_offset,
             chunks_origin,
-            chunk_indices: Arc::new(Mutex::new(chunk_indices)),
-            free_chunk_indices: Arc::new(Mutex::new(free_chunk_indices))
+            chunk_indices: Arc::new(RwLock::new(chunk_indices)),
+            free_chunk_indices: Arc::new(RwLock::new(free_chunk_indices))
         };
 
+
         terrain.load_empty_chunks(&renderer.queue);
+
 
         terrain
     }
 
 
+
+
     pub fn load_empty_chunks(&mut self, queue: &Queue) {
 
+
+
+
+
+
+        // let expected_count = self.chunk_indices.read().unwrap()
+        //     .iter()
+        //     .filter(|&index| index.is_none())
+        //     .count();
+
+
+
+
+
+
+        // println!("expected count: {:?}", expected_count);
+
+
+        // let barrier = Arc::new(Barrier::new(expected_count));
+
+
         (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
-            let chunk_index = self.chunk_indices.lock().unwrap()[i].clone();
+            //println!("thread start with idx: {:?}", i);
+
+
+
+
+            //let c = Arc::clone(&barrier);
+            let chunk_index = self.chunk_indices.read().unwrap()[i].clone();
             if let None = chunk_index {
-                let new_index = self.free_chunk_indices.lock().unwrap().pop_front().clone();
+                let new_index = self.free_chunk_indices.write().unwrap().pop_front();
                 if let Some(new_index) = new_index {
                     let chunk_offset = self.get_chunk_offset(i);
                     if !self.chunk_in_bounds(chunk_offset) {
                         panic!("Error: Cannot load chunk")
                     }
 
-                    self.chunks[new_index].lock().unwrap().offset = chunk_offset.into();
 
-                    generate_chunk( 
-                        &mut self.chunks[new_index].lock().unwrap().blocks,
+                    *self.chunks.offset_array[new_index].write().unwrap() = chunk_offset.into();
+
+
+                    //generate chunk will actually fill the block data for each chunk
+                    generate_chunk(
+                        &mut self.chunks.blocks_array[new_index].write().unwrap(),
                         chunk_offset.into(),
                     );
+                    // all threads should wait until all of them have finished the generate chunk......
 
-                    self.chunk_indices.lock().unwrap()[i] = Some(new_index);
+
+                    self.chunk_indices.write().unwrap()[i] = Some(new_index);
+                    //c.wait();
+                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap());
+                    *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
+
+
+                    // update mesh not only uses the chunk of the index, but tries to access another chunk neighbor blocks
+                   
+
+
                 } else {
                     panic!("Error: No free space for chunk")
                 }
             }
         });
 
+
+        // (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|new_index| {
+           
+        // });
+
+
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
-            let mut chunk = self.chunks.get(i).unwrap().lock().unwrap();
-            if chunk.updated {
-                let mesh = self.update_mesh(&mut chunk);
-                self.chunk_models[i].update(queue, &mesh, 0);
-                chunk.updated = false; 
-            }
+            self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
         });
+
 
         println!("---------------------------------");
     }
 
-    fn get_local_pos_in_neighbor(&self, world_pos: Vector3<i32>) -> Vector3<i32> {
-        let x = ((world_pos.x % CHUNK_AREA as i32) + CHUNK_AREA as i32) % CHUNK_AREA as i32;
-        let y = ((world_pos.y % CHUNK_Y_SIZE as i32) + CHUNK_Y_SIZE as i32) % CHUNK_Y_SIZE as i32;
-        let z = ((world_pos.z % CHUNK_AREA as i32) + CHUNK_AREA as i32) % CHUNK_AREA as i32;
-        Vector3::new(x, y, z)
-    }
 
 
-    fn get_chunk_by_world_position(&self, world_pos: Vector3<i32>) -> Option<Arc<Mutex<Chunk>>> {
 
-        if world_pos.y < 0 || world_pos.y >= CHUNK_Y_SIZE as i32 {
-            return None;
-        }
-        let index_x = (world_pos.x.div_euclid(CHUNK_AREA as i32) - self.chunks_origin.x);
-        let index_z = (world_pos.z.div_euclid(CHUNK_AREA as i32) - self.chunks_origin.z);
 
-        if index_x >= 0 && index_x < CHUNKS_VIEW_SIZE as i32 && index_z >= 0 && index_z < CHUNKS_VIEW_SIZE as i32 {
-            let index = (index_z * CHUNKS_VIEW_SIZE as i32 + index_x) as usize;
-            self.chunk_indices.lock().unwrap().get(index)
-                .and_then(|&idx| self.chunks.get(idx.unwrap()))
-                .map(Arc::clone)
-        } else {
-            None
-        }
-    }
 
-    pub fn update_mesh(&self, chunk: &mut Chunk) -> Mesh<BlockVertex> {
+
+
+
+
+    pub fn update_mesh(&self, blocks: &Blocks) -> Mesh<BlockVertex> {
+
 
         let mut verts =Vec::new();
         let mut indices = Vec::new();
         for y in 0.. CHUNK_Y_SIZE{
             for z in 0..CHUNK_AREA {
                 for x in 0..CHUNK_AREA {
-                    let block = chunk.blocks[y][x][z].lock().unwrap().clone();
+                    let block = blocks[y][x][z].lock().unwrap().clone();
                     let mut block_vertices = Vec::with_capacity(4 * 6);
                     let mut block_indices: Vec<u16> = Vec::with_capacity(6 * 6);
                     if block.material_type as i32 == MaterialType::AIR as i32 {
                         continue;
                     }
-            
+
+
                     let mut quad_counter = 0;
-            
+
+
                     for quad in block.quads.iter() {
                         let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-                        let visible = self.determine_visibility(&neighbour_pos, chunk);
-            
+                        let visible = self.determine_visibility(&neighbour_pos, blocks);
+
+
                         if visible {
                             block_vertices.extend_from_slice(&quad.vertices);
                             block_indices.extend_from_slice(&quad.get_indices(quad_counter));
@@ -175,29 +219,67 @@ impl Terrain {
             }
         }
 
+
         Mesh { verts, indices }
     }
-    
+
+
     /// Helper function to check visibility of a block
-    fn determine_visibility(&self, neighbour_pos: &Vector3<i32>,chunk: &mut Chunk) -> bool {
-        if Chunk::pos_in_chunk_bounds(*neighbour_pos) {
-            let neighbour_block = chunk.blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
+    fn determine_visibility(&self, neighbour_pos: &Vector3<i32>,blocks: &Blocks) -> bool {
+        if ChunkArray::pos_in_chunk_bounds(*neighbour_pos) {
+            let neighbour_block = blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
             return neighbour_block.material_type as u16 == MaterialType::AIR as u16;
         } else {
-            let world_pos = chunk.local_pos_to_world(*neighbour_pos);
-            chunk.updated = true;
-            //println!("world pos {:?}", world_pos);
-            if let Some(neighbour_chunk) = self.get_chunk_by_world_position(world_pos) {
-                let neighbour_chunk = neighbour_chunk.lock().unwrap();
-                let local_pos_in_neighbour = self.get_local_pos_in_neighbor(world_pos);
-                let neighbour_block = neighbour_chunk.blocks[local_pos_in_neighbour.y as usize][local_pos_in_neighbour.x as usize][local_pos_in_neighbour.z as usize].lock().unwrap();
-                return neighbour_block.material_type as u16 == MaterialType::AIR as u16;
-            } else {
-                return true; // If the chunk doesn't exist, treat the block as visible
+
+
+           // return  true;
+
+
+            if let Some(neighbour_block_type) = self.get_block_from_neighboring_chunk(*neighbour_pos) {
+                return neighbour_block_type == MaterialType::AIR;
+            }
+            else {
+                false
             }
         }
     }
-    
+
+
+    // Determine the chunk index based on a world position.
+    fn get_chunk_index_from_world_pos(&self, world_pos: Vector3<i32>) -> Option<usize> {
+        let chunk_offset = Self::world_pos_to_chunk_offset(Vector3::new(world_pos.x as f32, world_pos.y as f32, world_pos.z as f32));
+        if self.chunk_in_bounds(chunk_offset) {
+            let chunk_index = self.get_chunk_world_index(chunk_offset);
+            return Some(chunk_index);
+        }
+        None
+    }
+
+
+    // Get the block from a neighboring chunk, if it exists.
+    fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>) -> Option<MaterialType> {
+        let chunk_index = self.get_chunk_index_from_world_pos(neighbor_pos)?;
+        let chunk_offset = *self.chunks.offset_array[chunk_index].read().unwrap();
+
+
+        let local_pos = Vector3::new(
+            neighbor_pos.x - chunk_offset[0] * CHUNK_AREA as i32,
+            neighbor_pos.y - chunk_offset[1] * CHUNK_Y_SIZE as i32,
+            neighbor_pos.z - chunk_offset[2] * CHUNK_AREA as i32,
+        );
+
+
+        if ChunkArray::pos_in_chunk_bounds(local_pos) {
+            let neighbor_block = *self.chunks.blocks_array[chunk_index].read().unwrap()[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
+            return Some(neighbor_block.material_type);
+        }
+        None
+    }
+
+
+
+
+
 
 
 
@@ -205,6 +287,7 @@ impl Terrain {
     fn get_chunk_offset(&self, i: usize) -> Vector3<i32> {
         return self.chunks_origin + Vector3::new(i as i32 % CHUNKS_VIEW_SIZE as i32, 0, i as i32 / CHUNKS_VIEW_SIZE as i32);
     }
+
 
     fn chunk_in_bounds(&self, chunk_offset: Vector3<i32>) -> bool {
         let p = chunk_offset - self.chunks_origin;
@@ -214,6 +297,7 @@ impl Terrain {
         return false;
     }
 
+
     fn world_pos_to_chunk_offset(world_pos: Vector3<f32>) -> Vector3<i32> {
         return Vector3::new(
             (world_pos.x / CHUNK_AREA as f32).floor() as i32,
@@ -222,6 +306,7 @@ impl Terrain {
         );
     }
 
+
     // chunk offset -> world array index
     fn get_chunk_world_index(&self, chunk_offset: Vector3<i32>) -> usize {
         let p = chunk_offset - self.chunks_origin;
@@ -229,44 +314,52 @@ impl Terrain {
     }
 
 
+
+
     //called every frame
     pub fn update(&mut self, queue: &Queue, player_position: &Point3<f32>) {
 
+
         let new_center_offset = Self::world_pos_to_chunk_offset(player_position.to_vec());
         let new_chunk_origin = new_center_offset - Vector3::new(CHUNKS_VIEW_SIZE as i32 / 2, 0, CHUNKS_VIEW_SIZE as i32 / 2);
+
 
         if new_chunk_origin == self.chunks_origin {
             return;
         }
 
+
         self.center_offset = new_center_offset;
         self.chunks_origin = new_chunk_origin;
 
-        let chunk_indices_copy = self.chunk_indices.lock().unwrap().clone();
 
-        self.chunk_indices = Arc::new(Mutex::new([None; CHUNKS_ARRAY_SIZE]));
+        let chunk_indices_copy = self.chunk_indices.read().unwrap().clone();
+
+
+        self.chunk_indices = Arc::new(RwLock::new([None; CHUNKS_ARRAY_SIZE]));
         for i in 0..CHUNKS_ARRAY_SIZE {
             match chunk_indices_copy[i] {
                 Some(chunk_index) => {
-                    let chunk_offset = self.chunks.get(chunk_index).unwrap().lock().unwrap().offset.clone();
+                    let chunk_offset = self.chunks.offset_array.get(chunk_index).unwrap().read().unwrap().clone();
                     if self.chunk_in_bounds(chunk_offset.into()) {
                         let new_chunk_world_index = self.get_chunk_world_index(chunk_offset.into());
-                        self.chunk_indices.lock().unwrap()[new_chunk_world_index] = Some(chunk_index);
-                        self.chunks[chunk_index].lock().unwrap().updated = false; // Marcar como actualizado
-                        
+                        self.chunk_indices.write().unwrap()[new_chunk_world_index] = Some(chunk_index);
                     } else {
-                        self.free_chunk_indices.lock().unwrap().push_back(chunk_index);
-                        self.chunks[chunk_index].lock().unwrap().updated = true; // Marcar como actualizado
+                        self.free_chunk_indices.write().unwrap().push_back(chunk_index);
                     }
                 }
                 None => {}
             }
         }
 
+
         self.load_empty_chunks(queue);
     }
 
+
 }
+
+
 
 
 impl Draw for Terrain {
@@ -276,6 +369,7 @@ impl Draw for Terrain {
         render_pass.set_bind_group(1, &globals, &[]);
         for chunk_model in &self.chunk_models {
 
+
             render_pass.set_vertex_buffer(0, chunk_model.vbuf().slice(..));
             render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..chunk_model.num_indices as u32, 0, 0..1 as _);
@@ -283,3 +377,4 @@ impl Draw for Terrain {
         Ok(())
     }
 }
+
