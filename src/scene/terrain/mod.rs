@@ -10,7 +10,7 @@ use self::chunk::{generate_chunk, Blocks, ChunkArray, CHUNK_AREA, CHUNK_Y_SIZE};
 
 use cgmath::{EuclideanSpace, Point3, Vector3};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use wgpu::{Error, Queue};
+use wgpu::Queue;
 
 
 pub const LAND_LEVEL: usize = 9;
@@ -24,6 +24,7 @@ pub struct Terrain {
     pub chunks: ChunkArray,
     chunk_indices: Arc<RwLock<[Option<usize>; CHUNKS_ARRAY_SIZE]>>,
     free_chunk_indices: Arc<RwLock<VecDeque<usize>>>,
+    updated_indices: Arc<RwLock<[bool; CHUNKS_ARRAY_SIZE]>>,
     center_offset: Vector3<i32>,
     chunks_origin: Vector3<i32>,
     chunk_models: Vec<DynamicModel<BlockVertex>>
@@ -39,6 +40,7 @@ impl Terrain {
         let mut chunk_models = vec![];
         let mut chunks:ChunkArray = ChunkArray::default();
         let chunk_indices: [Option<usize>; CHUNKS_ARRAY_SIZE] = [None; CHUNKS_ARRAY_SIZE];
+        let updated_indices = Arc::new(RwLock::new([false; CHUNKS_ARRAY_SIZE]));
         let mut free_chunk_indices = VecDeque::new();
 
 
@@ -78,6 +80,7 @@ impl Terrain {
             chunk_models,
             center_offset,
             chunks_origin,
+            updated_indices,
             chunk_indices: Arc::new(RwLock::new(chunk_indices)),
             free_chunk_indices: Arc::new(RwLock::new(free_chunk_indices))
         };
@@ -96,32 +99,8 @@ impl Terrain {
 
 
 
-
-
-
-        // let expected_count = self.chunk_indices.read().unwrap()
-        //     .iter()
-        //     .filter(|&index| index.is_none())
-        //     .count();
-
-
-
-
-
-
-        // println!("expected count: {:?}", expected_count);
-
-
-        // let barrier = Arc::new(Barrier::new(expected_count));
-
-
         (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
-            //println!("thread start with idx: {:?}", i);
 
-
-
-
-            //let c = Arc::clone(&barrier);
             let chunk_index = self.chunk_indices.read().unwrap()[i].clone();
             if let None = chunk_index {
                 let new_index = self.free_chunk_indices.write().unwrap().pop_front();
@@ -134,23 +113,17 @@ impl Terrain {
 
                     *self.chunks.offset_array[new_index].write().unwrap() = chunk_offset.into();
 
-
-                    //generate chunk will actually fill the block data for each chunk
                     generate_chunk(
                         &mut self.chunks.blocks_array[new_index].write().unwrap(),
                         chunk_offset.into(),
                     );
-                    // all threads should wait until all of them have finished the generate chunk......
-
 
                     self.chunk_indices.write().unwrap()[i] = Some(new_index);
-                    //c.wait();
                     let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap());
                     *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
 
-
-                    // update mesh not only uses the chunk of the index, but tries to access another chunk neighbor blocks
-                   
+                    // Mark this index as updated
+                    self.updated_indices.write().unwrap()[new_index] = true;
 
 
                 } else {
@@ -160,13 +133,15 @@ impl Terrain {
         });
 
 
-        // (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|new_index| {
-           
-        // });
-
-
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
-            self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
+            println!("trying to update");
+
+            if self.updated_indices.read().unwrap()[i] {
+                self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
+                self.updated_indices.write().unwrap()[i] = false;
+                println!("selected to update")
+            }
+            
         });
 
 
@@ -357,24 +332,25 @@ impl Terrain {
     }
 
 
+
 }
 
-
-
-
 impl Draw for Terrain {
-    fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, globals: &'a wgpu::BindGroup) -> Result<(), Error> {
+    fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, globals: &'a wgpu::BindGroup) -> Result<(), wgpu::Error> {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.atlas.bind_group, &[]);
         render_pass.set_bind_group(1, &globals, &[]);
+        
         for chunk_model in &self.chunk_models {
+                let vertex_buffer = chunk_model.vbuf().slice(..);
+                let index_buffer = chunk_model.ibuf().slice(..);
+                let num_indices = chunk_model.num_indices;
 
-
-            render_pass.set_vertex_buffer(0, chunk_model.vbuf().slice(..));
-            render_pass.set_index_buffer(chunk_model.ibuf().slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..chunk_model.num_indices as u32, 0, 0..1 as _);
+                render_pass.set_vertex_buffer(0, vertex_buffer);
+                render_pass.set_index_buffer(index_buffer, wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(0..num_indices as u32, 0, 0..1 as _);
         }
+        
         Ok(())
     }
 }
-
