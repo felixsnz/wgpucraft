@@ -80,9 +80,9 @@ fn init_blocks(offset: [i32; 3]) -> Blocks {
 
 pub fn local_pos_to_world(offset:[i32;3], local_pos: Vector3<i32>) -> Vector3<f32> {
     Vector3::new(
-        (local_pos.x + offset[0]) as f32 * CHUNK_AREA as f32,
-        (local_pos.y + offset[1]) as f32 * CHUNK_AREA as f32,
-        (local_pos.z + offset[2]) as f32 * CHUNK_AREA as f32
+        local_pos.x as f32 + offset[0] as f32 * CHUNK_AREA as f32,
+        local_pos.y as f32 + offset[1] as f32 * CHUNK_AREA as f32,
+        local_pos.z as f32 + offset[2] as f32 * CHUNK_AREA as f32
     )
 }
 

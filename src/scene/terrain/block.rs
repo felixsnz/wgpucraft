@@ -116,6 +116,7 @@ pub struct Block {
     pub quads: [Quad; 6],
     pub position: [i32; 3],
     pub material_type: MaterialType,
+    chunk_offset: [i32; 3]
 }
 
 impl Block {
@@ -126,12 +127,22 @@ impl Block {
             quads,
             position,
             material_type,
+            chunk_offset
         }
     }
 
     pub fn get_vec_position(&self) -> Vector3<i32>{
         Vector3::new(self.position[0], self.position[1], self.position[2])
     }
+
+    // pub fn get_world_position(&self) -> [i32; 3] {
+    //     let world_pos = [
+    //         self.position[0] + (self.chunk_offset[0] * CHUNK_AREA as i32),
+    //         self.position[1],
+    //         self.position[2] + (self.chunk_offset[2] * CHUNK_AREA as i32),
+    //     ];
+    //     world_pos
+    // }
 
     fn generate_quads(material_type: MaterialType, position: [i32; 3], chunk_offset: [i32; 3]) -> [Quad; 6] {
         let world_pos = [
@@ -151,6 +162,7 @@ impl Block {
     }
 
     pub fn update(&mut self, new_material_type: MaterialType, offset: [i32; 3]) {
+        self.chunk_offset = offset;
         self.material_type = new_material_type;
         self.quads = Block::generate_quads(new_material_type, self.position, offset);
     }

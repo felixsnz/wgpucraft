@@ -10,7 +10,6 @@ pub mod binding;
 
 
 
-
-pub trait Vertex: Clone + bytemuck::Pod {
+pub trait Vertex: Copy + bytemuck::Pod {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 }
