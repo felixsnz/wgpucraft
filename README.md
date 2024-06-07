@@ -33,7 +33,7 @@ Because i'm too cool for that, i like to struggle, and that keeps my mind busy, 
 
 ### Work in progress...
 
-* optimize chunk system (right now is very laggy)
+* optimize chunk system
 * chunk culling (similar to face culling but considering chunk neighbors)
 * terrain generation based on noise map 
 
