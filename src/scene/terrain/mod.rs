@@ -9,12 +9,13 @@ use self::chunk::{generate_chunk, Blocks, ChunkArray, CHUNK_AREA, CHUNK_Y_SIZE};
 
 
 use cgmath::{EuclideanSpace, Point3, Vector3};
+use chunk::local_pos_to_world;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::Queue;
 
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 16;
+pub const CHUNKS_VIEW_SIZE: usize = 2;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 
@@ -119,7 +120,7 @@ impl Terrain {
                     );
 
                     self.chunk_indices.write().unwrap()[i] = Some(new_index);
-                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap());
+                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap(), new_index);
                     *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
 
                     // Mark this index as updated
@@ -157,7 +158,7 @@ impl Terrain {
 
 
 
-    pub fn update_mesh(&self, blocks: &Blocks) -> Mesh<BlockVertex> {
+    pub fn update_mesh(&self, blocks: &Blocks, index: usize) -> Mesh<BlockVertex> {
 
 
         let mut verts =Vec::new();
@@ -178,7 +179,7 @@ impl Terrain {
 
                     for quad in block.quads.iter() {
                         let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-                        let visible = self.determine_visibility(&neighbour_pos, blocks);
+                        let visible = self.determine_visibility(&neighbour_pos, blocks, index);
 
 
                         if visible {
@@ -200,17 +201,19 @@ impl Terrain {
 
 
     /// Helper function to check visibility of a block
-    fn determine_visibility(&self, neighbour_pos: &Vector3<i32>,blocks: &Blocks) -> bool {
+    fn determine_visibility(&self, neighbour_pos: &Vector3<i32>,blocks: &Blocks, index: usize) -> bool {
+
+        //println!("block neighbour pos: {:?}", neighbour_pos);
         if ChunkArray::pos_in_chunk_bounds(*neighbour_pos) {
             let neighbour_block = blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
             return neighbour_block.material_type as u16 == MaterialType::AIR as u16;
-        } else {
+        } else { //if not in bounds, it means that the neighbour block belongs to a different chunk
 
 
            // return  true;
 
 
-            if let Some(neighbour_block_type) = self.get_block_from_neighboring_chunk(*neighbour_pos) {
+            if let Some(neighbour_block_type) = self.get_block_from_neighboring_chunk(*neighbour_pos, index) {
                 return neighbour_block_type == MaterialType::AIR;
             }
             else {
@@ -232,20 +235,29 @@ impl Terrain {
 
 
     // Get the block from a neighboring chunk, if it exists.
-    fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>) -> Option<MaterialType> {
-        let chunk_index = self.get_chunk_index_from_world_pos(neighbor_pos)?;
-        let chunk_offset = *self.chunks.offset_array[chunk_index].read().unwrap();
+    fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>, index: usize) -> Option<MaterialType> {
+        
+        let chunk_offset = *self.chunks.offset_array[index].read().unwrap();
+
+
+        let world_pos = local_pos_to_world(chunk_offset, neighbor_pos);
+
+        let neighbour_chunk_index = self.get_chunk_index_from_world_pos(Vector3::new(world_pos.x as i32, world_pos.y as i32, world_pos.z as i32))?;
+        let neighbour_chunk_offset = *self.chunks.offset_array[neighbour_chunk_index].read().unwrap();
+
+
+        //println!("chunk_offset: {:?}", chunk_offset);
 
 
         let local_pos = Vector3::new(
-            neighbor_pos.x - chunk_offset[0] * CHUNK_AREA as i32,
-            neighbor_pos.y - chunk_offset[1] * CHUNK_Y_SIZE as i32,
-            neighbor_pos.z - chunk_offset[2] * CHUNK_AREA as i32,
+            world_pos.x as i32 - neighbour_chunk_offset[0] * CHUNK_AREA as i32,
+            world_pos.y as i32- neighbour_chunk_offset[1] * CHUNK_Y_SIZE as i32,
+            world_pos.z as i32- neighbour_chunk_offset[2] * CHUNK_AREA as i32,
         );
 
 
         if ChunkArray::pos_in_chunk_bounds(local_pos) {
-            let neighbor_block = *self.chunks.blocks_array[chunk_index].read().unwrap()[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
+            let neighbor_block = *self.chunks.blocks_array[index].read().unwrap()[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
             return Some(neighbor_block.material_type);
         }
         None
