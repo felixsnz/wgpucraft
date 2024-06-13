@@ -151,13 +151,6 @@ impl Terrain {
 
 
 
-
-
-
-
-
-
-
     pub fn update_mesh(&self, blocks: &Blocks, index: usize) -> Mesh<BlockVertex> {
 
 
@@ -178,8 +171,8 @@ impl Terrain {
 
 
                     for quad in block.quads.iter() {
-                        let neighbour_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-                        let visible = self.determine_visibility(&neighbour_pos, blocks, index);
+                        let neighbor_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
+                        let visible = self.determine_visibility(&neighbor_pos, blocks, index);
 
 
                         if visible {
@@ -201,22 +194,24 @@ impl Terrain {
 
 
     /// Helper function to check visibility of a block
-    fn determine_visibility(&self, neighbour_pos: &Vector3<i32>,blocks: &Blocks, index: usize) -> bool {
+    fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks, index: usize) -> bool {
 
-        //println!("block neighbour pos: {:?}", neighbour_pos);
-        if ChunkArray::pos_in_chunk_bounds(*neighbour_pos) {
-            let neighbour_block = blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
-            return neighbour_block.material_type as u16 == MaterialType::AIR as u16;
-        } else { //if not in bounds, it means that the neighbour block belongs to a different chunk
+        //println!("block neighbor pos: {:?}", neighbor_pos);
+        if ChunkArray::pos_in_chunk_bounds(*neighbor_pos) {
+            let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].lock().unwrap();
+            return neighbor_block.material_type as u16 == MaterialType::AIR as u16;
+        } else { //if not in bounds, it means that the neighbor block belongs to a different chunk
 
 
            // return  true;
 
 
-            if let Some(neighbour_block_type) = self.get_block_from_neighboring_chunk(*neighbour_pos, index) {
-                return neighbour_block_type == MaterialType::AIR;
+            if let Some(neighbor_block_type) = self.get_block_from_neighboring_chunk(*neighbor_pos, index) {
+                println!("esto solo deberia salir una vez asdad");
+                return neighbor_block_type == MaterialType::AIR;
             }
             else {
+                println!("no neighbor block xd");
                 false
             }
         }
@@ -236,23 +231,25 @@ impl Terrain {
 
     // Get the block from a neighboring chunk, if it exists.
     fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>, index: usize) -> Option<MaterialType> {
+
+        println!("neighbor");
         
         let chunk_offset = *self.chunks.offset_array[index].read().unwrap();
 
 
         let world_pos = local_pos_to_world(chunk_offset, neighbor_pos);
 
-        let neighbour_chunk_index = self.get_chunk_index_from_world_pos(Vector3::new(world_pos.x as i32, world_pos.y as i32, world_pos.z as i32))?;
-        let neighbour_chunk_offset = *self.chunks.offset_array[neighbour_chunk_index].read().unwrap();
+        let neighbor_chunk_index = self.get_chunk_index_from_world_pos(Vector3::new(world_pos.x as i32, world_pos.y as i32, world_pos.z as i32))?;
+        let neighbor_chunk_offset = *self.chunks.offset_array[neighbor_chunk_index].read().unwrap();
 
 
-        //println!("chunk_offset: {:?}", chunk_offset);
+        println!("chunk_offset: {:?}", chunk_offset);
 
 
         let local_pos = Vector3::new(
-            world_pos.x as i32 - neighbour_chunk_offset[0] * CHUNK_AREA as i32,
-            world_pos.y as i32- neighbour_chunk_offset[1] * CHUNK_Y_SIZE as i32,
-            world_pos.z as i32- neighbour_chunk_offset[2] * CHUNK_AREA as i32,
+            world_pos.x as i32 - (neighbor_chunk_offset[0] * CHUNK_AREA as i32),
+            world_pos.y as i32- (neighbor_chunk_offset[1] * CHUNK_Y_SIZE as i32),
+            world_pos.z as i32- (neighbor_chunk_offset[2] * CHUNK_AREA as i32),
         );
 
 

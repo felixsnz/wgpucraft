@@ -88,12 +88,12 @@ impl<V: Vertex> Mesh<V>
                     let mut quad_counter = 0;
                     for quad in block.quads.iter() {
                         let mut visible = false;
-                        let neighbour_pos = block.get_vec_position() + quad.side.to_vec();
+                        let neighbor_pos = block.get_vec_position() + quad.side.to_vec();
 
 
-                        if ChunkArray::pos_in_chunk_bounds(neighbour_pos) {
-                            let neighbour_block = blocks[neighbour_pos.y as usize][neighbour_pos.x as usize][neighbour_pos.z as usize].lock().unwrap();
-                            if neighbour_block.material_type as u16 == MaterialType::AIR as u16 {
+                        if ChunkArray::pos_in_chunk_bounds(neighbor_pos) {
+                            let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].lock().unwrap();
+                            if neighbor_block.material_type as u16 == MaterialType::AIR as u16 {
                                 visible = true;
                             }
 
