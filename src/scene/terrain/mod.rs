@@ -18,6 +18,23 @@ pub const LAND_LEVEL: usize = 9;
 pub const CHUNKS_VIEW_SIZE: usize = 2;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
+
+// Atomic counter to assign unique thread identifiers
+static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+// Thread-local variable to store the thread identifier
+thread_local! {
+    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::SeqCst);
+}
+
+// Function to get the current thread identifier
+fn get_thread_id() -> usize {
+    THREAD_ID.with(|id| *id)
+}
+
+
 
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
@@ -102,6 +119,10 @@ impl Terrain {
 
         (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
 
+            let thread_id = get_thread_id();
+
+            println!("thread_id {:?}", thread_id);
+
             let chunk_index = self.chunk_indices.read().unwrap()[i].clone();
             if let None = chunk_index {
                 let new_index = self.free_chunk_indices.write().unwrap().pop_front();
@@ -120,7 +141,7 @@ impl Terrain {
                     );
 
                     self.chunk_indices.write().unwrap()[i] = Some(new_index);
-                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap(), new_index);
+                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap(), new_index, thread_id);
                     *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
 
                     // Mark this index as updated
@@ -151,7 +172,7 @@ impl Terrain {
 
 
 
-    pub fn update_mesh(&self, blocks: &Blocks, index: usize) -> Mesh<BlockVertex> {
+    pub fn update_mesh(&self, blocks: &Blocks, index: usize, thread_id:usize) -> Mesh<BlockVertex> {
 
 
         let mut verts =Vec::new();
@@ -172,7 +193,7 @@ impl Terrain {
 
                     for quad in block.quads.iter() {
                         let neighbor_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-                        let visible = self.determine_visibility(&neighbor_pos, blocks, index);
+                        let visible = self.determine_visibility(&neighbor_pos, blocks, index, thread_id);
 
 
                         if visible {
@@ -194,7 +215,7 @@ impl Terrain {
 
 
     /// Helper function to check visibility of a block
-    fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks, index: usize) -> bool {
+    fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks, index: usize, thread_id:usize) -> bool {
 
         //println!("block neighbor pos: {:?}", neighbor_pos);
         if ChunkArray::pos_in_chunk_bounds(*neighbor_pos) {
@@ -206,44 +227,50 @@ impl Terrain {
            // return  true;
 
 
-            if let Some(neighbor_block_type) = self.get_block_from_neighboring_chunk(*neighbor_pos, index) {
+            if let Some(neighbor_block_type) = self.get_block_from_neighboring_chunk(*neighbor_pos, index, thread_id) {
                 println!("esto solo deberia salir una vez asdad");
                 return neighbor_block_type == MaterialType::AIR;
             }
             else {
-                println!("no neighbor block xd");
+                //println!("no neighbor block xd");
                 false
             }
         }
     }
 
 
-    // Determine the chunk index based on a world position.
-    fn get_chunk_index_from_world_pos(&self, world_pos: Vector3<i32>) -> Option<usize> {
+    fn get_chunk_index_from_world_pos(&self, world_pos: Vector3<i32>, thread_id:usize) -> Option<usize> {
         let chunk_offset = Self::world_pos_to_chunk_offset(Vector3::new(world_pos.x as f32, world_pos.y as f32, world_pos.z as f32));
+        println!("neighbor chunk_offset: {:?}", chunk_offset);
         if self.chunk_in_bounds(chunk_offset) {
             let chunk_index = self.get_chunk_world_index(chunk_offset);
+            println!("calculated chunk_index: {:?} for chunk_offset: {:?}", chunk_index, chunk_offset);
             return Some(chunk_index);
         }
+        println!("chunk_offset out of bounds: {:?}", chunk_offset);
         None
     }
 
 
     // Get the block from a neighboring chunk, if it exists.
-    fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>, index: usize) -> Option<MaterialType> {
+    fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>, index: usize, thread_id:usize) -> Option<MaterialType> {
+        println!("current chunk index: {:?} | at thread: {:?}", index, thread_id);
 
-        println!("neighbor");
+        println!("neighbor pos from current chunk: {:?} | at thread: {:?}", neighbor_pos, thread_id);
         
         let chunk_offset = *self.chunks.offset_array[index].read().unwrap();
-
+        println!("current chunk_offset: {:?} | at thread: {:?}", chunk_offset, thread_id);
 
         let world_pos = local_pos_to_world(chunk_offset, neighbor_pos);
 
-        let neighbor_chunk_index = self.get_chunk_index_from_world_pos(Vector3::new(world_pos.x as i32, world_pos.y as i32, world_pos.z as i32))?;
+        println!("world pos of neighbor: {:?} | at thread: {:?}", world_pos, thread_id);
+
+        let neighbor_chunk_index = self.get_chunk_index_from_world_pos(Vector3::new(world_pos.x as i32, world_pos.y as i32, world_pos.z as i32), thread_id)?;
+        println!("neighbor_chunk_index: {:?} | at thread: {:?}", neighbor_chunk_index, thread_id);
         let neighbor_chunk_offset = *self.chunks.offset_array[neighbor_chunk_index].read().unwrap();
+        println!("neighbor chunk_offset: {:?} | at thread: {:?}", neighbor_chunk_offset, thread_id);
 
-
-        println!("chunk_offset: {:?}", chunk_offset);
+        
 
 
         let local_pos = Vector3::new(
@@ -252,9 +279,12 @@ impl Terrain {
             world_pos.z as i32- (neighbor_chunk_offset[2] * CHUNK_AREA as i32),
         );
 
+        println!("local pos of neighbor block relative to neighbor chunk: {:?} | at thread: {:?}", local_pos, thread_id);
+        
+
 
         if ChunkArray::pos_in_chunk_bounds(local_pos) {
-            let neighbor_block = *self.chunks.blocks_array[index].read().unwrap()[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
+            let neighbor_block = *self.chunks.blocks_array[neighbor_chunk_index].read().unwrap()[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
             return Some(neighbor_block.material_type);
         }
         None
@@ -283,18 +313,16 @@ impl Terrain {
 
 
     fn world_pos_to_chunk_offset(world_pos: Vector3<f32>) -> Vector3<i32> {
-        return Vector3::new(
+        Vector3::new(
             (world_pos.x / CHUNK_AREA as f32).floor() as i32,
             0,
             (world_pos.z / CHUNK_AREA as f32).floor() as i32,
-        );
+        )
     }
-
-
-    // chunk offset -> world array index
+    
     fn get_chunk_world_index(&self, chunk_offset: Vector3<i32>) -> usize {
         let p = chunk_offset - self.chunks_origin;
-        return p.z as usize * CHUNKS_VIEW_SIZE + p.x as usize;
+        (p.z as usize * CHUNKS_VIEW_SIZE) + p.x as usize
     }
 
 
