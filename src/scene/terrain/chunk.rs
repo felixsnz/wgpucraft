@@ -138,9 +138,13 @@ pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3]) {
         let x = i % CHUNK_AREA;
 
 
-        // Example mathematical function: a simple sine wave pattern
-        let new_height = ((x as f32 + offset[0] as f32).sin() + (z as f32 + offset[2] as f32).sin() * 10.0).round() as usize;
-
+        // Función matemática simple para generar un terreno 3D con colinas suaves
+        let base_height = 10.0;
+        let frequency = 0.1;
+        let amplitude = 5.0;
+        
+        let height_variation = (x as f32 * frequency).sin() + (z as f32 * frequency).sin();
+        let new_height = (base_height + height_variation * amplitude).round() as usize;
 
         let block_type = if y > new_height {
             if y <= LAND_LEVEL {
