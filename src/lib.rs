@@ -120,13 +120,17 @@ impl Game {
 
     pub fn initialize(&mut self) {
         self.window.set_cursor_visible(false);
-        self.window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
+
+        match self.window.set_cursor_grab(winit::window::CursorGrabMode::Locked) {
+            Ok(_) => {}
+            Err(e) => eprintln!("Failed to set cursor grab mode: {:?}", e),
+        }
+
         let center = winit::dpi::PhysicalPosition::new(self.renderer.size.width / 2, self.renderer.size.height / 2);
-        self.window.set_cursor_position(center).unwrap_or_else(|e| {
-            eprintln!("Failed to set cursor position: {:?}", e);
-        });
-
-
+        match self.window.set_cursor_position(center) {
+            Ok(_) => {}
+            Err(e) => eprintln!("Failed to set cursor position: {:?}", e),
+        }
     }
 
 
