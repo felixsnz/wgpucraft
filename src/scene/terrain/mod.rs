@@ -15,7 +15,7 @@ use wgpu::Queue;
 
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 2;
+pub const CHUNKS_VIEW_SIZE: usize = 12;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -115,66 +115,50 @@ impl Terrain {
 
     pub fn load_empty_chunks(&mut self, queue: &Queue) {
 
+        (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
 
 
-        let barrier = Arc::new(Barrier::new(CHUNKS_ARRAY_SIZE-1));
-
-        let pool = ThreadPoolBuilder::new().num_threads(CHUNKS_ARRAY_SIZE).build().unwrap();
-
-        pool.install(|| {
-            (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
-                let barrier = Arc::clone(&barrier); // Clonar la referencia a la barrera para cada hilo
-                let thread_id = get_thread_id();
-
-                println!("thread_id {:?}", thread_id);
-
-                let chunk_index = self.chunk_indices.read().unwrap()[i].clone();
-                if let None = chunk_index {
-                    let new_index = self.free_chunk_indices.write().unwrap().pop_front();
-                    if let Some(new_index) = new_index {
-                        let chunk_offset = self.get_chunk_offset(i);
-                        if !self.chunk_in_bounds(chunk_offset) {
-                            panic!("Error: Cannot load chunk")
-                        }
-                        
-                        *self.chunks.offset_array[new_index].write().unwrap() = chunk_offset.into();
-                        
-                        generate_chunk(
-                            &mut self.chunks.blocks_array[new_index].write().unwrap(),
-                            chunk_offset.into(),
-                        );
-                        println!("just gen chunk at thread_id {:?}", thread_id);
-
-                        self.chunk_indices.write().unwrap()[i] = Some(new_index);
-
-                        // Esperar hasta que todos los hilos hayan llegado a este punto
-                        // barrier.wait();
-                        println!("about to calculate mesh at thread_id {:?}", thread_id);
-                        let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap(),new_index, thread_id, chunk_offset);
-                        *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
-
-                        // Marcar este índice como actualizado
-                        //self.updated_indices.write().unwrap()[new_index] = true;
-
-                    } else {
-                        panic!("Error: No free space for chunk")
+            let chunk_index = self.chunk_indices.read().unwrap()[i].clone();
+            if let None = chunk_index {
+                let new_index = self.free_chunk_indices.write().unwrap().pop_front();
+                if let Some(new_index) = new_index {
+                    let chunk_offset = self.get_chunk_offset(i);
+                    if !self.chunk_in_bounds(chunk_offset) {
+                        panic!("Error: Cannot load chunk")
                     }
-                }
-            });
-        });
+                    
+                    *self.chunks.offset_array[new_index].write().unwrap() = chunk_offset.into();
+                    
+                    generate_chunk(
+                        &mut self.chunks.blocks_array[new_index].write().unwrap(),
+                        chunk_offset.into(),
+                    );
 
+                    self.chunk_indices.write().unwrap()[i] = Some(new_index);
+
+
+                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap());
+                    *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
+
+                    // Mark this index as updated
+                    self.updated_indices.write().unwrap()[new_index] = true;
+
+
+                } else {
+                    panic!("Error: No free space for chunk")
+                }
+            }
+        });
+    
 
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
-            //println!("trying to update");
 
-            self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
+            if self.updated_indices.read().unwrap()[i] {
+                self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
+                self.updated_indices.write().unwrap()[i] = false;
+                println!("selected to update")
+            }
 
-            // if self.updated_indices.read().unwrap()[i] {
-            //     self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
-            //     self.updated_indices.write().unwrap()[i] = false;
-            //     //println!("selected to update")
-            // }
-            
         });
 
 
@@ -183,7 +167,7 @@ impl Terrain {
 
 
 
-    pub fn update_mesh(&self, blocks: &Blocks, index: usize, thread_id:usize, chunk_offset:Vector3<i32>) -> Mesh<BlockVertex> {
+    pub fn update_mesh(&self, blocks: &Blocks) -> Mesh<BlockVertex> {
 
 
         let mut verts =Vec::new();
@@ -204,7 +188,7 @@ impl Terrain {
 
                     for quad in block.quads.iter() {
                         let neighbor_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-                        let visible = self.determine_visibility(&neighbor_pos, blocks, index, thread_id, chunk_offset);
+                        let visible = self.determine_visibility(&neighbor_pos, blocks);
 
 
                         if visible {
@@ -226,7 +210,7 @@ impl Terrain {
 
 
     /// Helper function to check visibility of a block
-    fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks, index: usize, thread_id:usize, chunk_offset:Vector3<i32>) -> bool {
+    fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks) -> bool {
 
         //println!("block neighbor pos: {:?}", neighbor_pos);
         if ChunkArray::pos_in_chunk_bounds(*neighbor_pos) {
@@ -235,80 +219,8 @@ impl Terrain {
         } else { //if not in bounds, it means that the neighbor block belongs to a different chunk
 
 
-            // return  true;
-
-            if neighbor_pos.y < 0 || neighbor_pos.y >= CHUNK_Y_SIZE as i32 {
-                return true;
-            }
-
-
-            if let Some(neighbor_block_type) = self.get_block_from_neighboring_chunk(*neighbor_pos, index, thread_id, chunk_offset) {
-                return neighbor_block_type == MaterialType::AIR;
-            }
-            else {
-                true
-            }
+            return  true;
         }
-    }
-
-    // Get the block from a neighboring chunk, if it exists.
-    fn get_block_from_neighboring_chunk(&self, neighbor_pos: Vector3<i32>, indexss: usize, thread_id:usize, chunk_offset_orig:Vector3<i32>) -> Option<MaterialType> {
-        //println!("out of bounds condition  | at thread: {:?}", thread_id);
-
-        
-        //let chunk_offset = *self.chunks.offset_array[index].read().unwrap();
-        let world_pos = local_pos_to_world(chunk_offset_orig.into(), neighbor_pos);
-        let neighbor_chunk_offset = Self::world_pos_to_chunk_offset(world_pos);
-        let orig_index = self.get_chunk_world_index(chunk_offset_orig);
-
-        if self.chunk_in_bounds(neighbor_chunk_offset) {
-
-            let neighbor_chunk_index = self.get_chunk_world_index(neighbor_chunk_offset);
-            
-            if orig_index == neighbor_chunk_index {
-                println!("original chunk_offset: {:?}                      | at thread: {:?}", chunk_offset_orig, thread_id);
-
-                println!("neighbor pos from current chunk: {:?}  | at thread: {:?}", neighbor_pos, thread_id);
-                println!("current chunk index:                               {:?} | at thread: {:?}", orig_index, thread_id);
-                //println!("current chunk_offset: {:?}                      | at thread: {:?}", chunk_offset, thread_id);
-                println!("world pos of neighbor: {:?}      | at thread: {:?}", world_pos, thread_id);
-                println!("-----------------------------------------------------------");
-                println!("neighbor_chunk_offset: {:?}            | at thread: {:?}", neighbor_chunk_offset, thread_id);
-                //println!("current chunk index from its chunk offset:              {:?} | at thread: {:?}", self.get_chunk_world_index(chunk_offset.into()), thread_id);
-                println!("neighbor_chunk_index:                               {:?} | at thread: {:?}", neighbor_chunk_index, thread_id);
-                println!("error!!");
-
-            }
-    
-            
-    
-    
-            let local_pos = Vector3::new(
-                world_pos.x as i32 - (neighbor_chunk_offset[0] * CHUNK_AREA as i32),
-                world_pos.y as i32- (neighbor_chunk_offset[1] * CHUNK_Y_SIZE as i32),
-                world_pos.z as i32- (neighbor_chunk_offset[2] * CHUNK_AREA as i32),
-            );
-    
-            //println!("local pos of neighbor block relative to neighbor chunk: {:?} | at thread: {:?}", local_pos, thread_id);
-    
-            
-    
-    
-            if ChunkArray::pos_in_chunk_bounds(local_pos) {
-                let neighbor_block = *self.chunks.blocks_array[neighbor_chunk_index].read().unwrap()[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
-                return Some(neighbor_block.material_type);
-            }
-
-            
-    
-
-        } else {
-            return None
-        }
-
-
-
-        None
     }
 
 
@@ -369,7 +281,7 @@ impl Terrain {
             match chunk_indices_copy[i] {
                 Some(chunk_index) => {
                     let chunk_offset = self.chunks.offset_array.get(chunk_index).unwrap().read().unwrap().clone();
-                    if self.is_inner_chunk(chunk_offset.into()) {
+                    if self.chunk_in_bounds(chunk_offset.into()) {
                         let new_chunk_world_index = self.get_chunk_world_index(chunk_offset.into());
                         self.chunk_indices.write().unwrap()[new_chunk_world_index] = Some(chunk_index);
                     } else {
@@ -382,12 +294,6 @@ impl Terrain {
 
         self.load_empty_chunks(queue);
     }
-
-    fn is_inner_chunk(&self, chunk_offset: Vector3<i32>) -> bool {
-        let p = chunk_offset - self.chunks_origin;
-        p.x > 0 && p.z > 0 && p.x < (CHUNKS_VIEW_SIZE as i32 - 1) && p.z < (CHUNKS_VIEW_SIZE as i32 - 1)
-    }
-
 
 
 }
