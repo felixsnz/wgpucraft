@@ -132,7 +132,7 @@ impl ChunkArray {
 
 
 pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &BiomeParameters) {
-    let noise_generator = NoiseGenerator::new(seed, biome.octaves, biome.persistence, biome.lacunarity);
+    let noise_generator = NoiseGenerator::new(seed);
 
     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {
         let z = i / (CHUNK_AREA * CHUNK_Y_SIZE);
