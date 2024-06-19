@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::render::{atlas::MaterialType, mesh::Mesh, pipelines::terrain::BlockVertex};
 
 
-use super::{block::Block, LAND_LEVEL};
+use super::{block::Block, LAND_LEVEL, noise::NoiseGenerator, biomes::BiomeParameters};
 
 
 pub const CHUNK_Y_SIZE:usize = 100;
@@ -131,20 +131,17 @@ impl ChunkArray {
 }
 
 
-pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3]) {
+pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &BiomeParameters) {
+    let noise_generator = NoiseGenerator::new(seed, biome.octaves, biome.persistence, biome.lacunarity);
+
     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {
         let z = i / (CHUNK_AREA * CHUNK_Y_SIZE);
         let y = (i - z * CHUNK_AREA * CHUNK_Y_SIZE) / CHUNK_AREA;
         let x = i % CHUNK_AREA;
+        let world_pos = local_pos_to_world(offset, Vector3::new(x as i32, y as i32, z as i32));
 
-
-        // Función matemática simple para generar un terreno 3D con colinas suaves
-        let base_height = 10.0;
-        let frequency = 0.1;
-        let amplitude = 5.0;
-        
-        let height_variation = (x as f32 * frequency).sin() + (z as f32 * frequency).sin();
-        let new_height = (base_height + height_variation * amplitude).round() as usize;
+        let height_variation = noise_generator.get_height(world_pos.x as f32, world_pos.z as f32, biome.frequency, biome.amplitude);
+        let new_height = (biome.base_height + height_variation).round() as usize;
 
         let block_type = if y > new_height {
             if y <= LAND_LEVEL {
@@ -160,8 +157,6 @@ pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3]) {
             MaterialType::DIRT
         };
 
-
         blocks[y][x][z].lock().unwrap().update(block_type, offset);
     });
 }
-

@@ -1,15 +1,16 @@
 pub mod block;
 pub mod chunk;
-use std::{collections::VecDeque, sync::{Arc, RwLock, Barrier}};
-use rayon::ThreadPoolBuilder;
+pub mod noise;
+pub mod biomes;
+use std::{collections::VecDeque, sync::{Arc, RwLock}};
 
 use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
 use self::chunk::{generate_chunk, Blocks, ChunkArray, CHUNK_AREA, CHUNK_Y_SIZE};
 
 
+use biomes::{MOUNTAIN_PARAMS, PRAIRIE_PARAMS};
 use cgmath::{EuclideanSpace, Point3, Vector3};
-use chunk::local_pos_to_world;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::Queue;
 
@@ -18,20 +19,6 @@ pub const LAND_LEVEL: usize = 9;
 pub const CHUNKS_VIEW_SIZE: usize = 12;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-// Atomic counter to assign unique thread identifiers
-static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(1);
-
-// Thread-local variable to store the thread identifier
-thread_local! {
-    static THREAD_ID: usize = THREAD_COUNTER.fetch_add(1, Ordering::SeqCst);
-}
-
-// Function to get the current thread identifier
-fn get_thread_id() -> usize {
-    THREAD_ID.with(|id| *id)
-}
 
 
 
@@ -132,6 +119,8 @@ impl Terrain {
                     generate_chunk(
                         &mut self.chunks.blocks_array[new_index].write().unwrap(),
                         chunk_offset.into(),
+                        892984781,
+                        &PRAIRIE_PARAMS
                     );
 
                     self.chunk_indices.write().unwrap()[i] = Some(new_index);
