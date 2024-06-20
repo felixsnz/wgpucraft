@@ -6,7 +6,7 @@ use std::{collections::VecDeque, sync::{Arc, RwLock}};
 
 use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
-use self::chunk::{generate_chunk, Blocks, ChunkArray, CHUNK_AREA, CHUNK_Y_SIZE};
+use self::chunk::{generate_chunk, Blocks, CHUNK_AREA, CHUNK_Y_SIZE, Chunk, pos_in_chunk_bounds};
 
 
 use biomes::{MOUNTAIN_PARAMS, PRAIRIE_PARAMS};
@@ -25,7 +25,7 @@ pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 pub struct Terrain {
     pipeline: wgpu::RenderPipeline,
     atlas: Atlas,
-    pub chunks: ChunkArray,
+    pub chunks: Vec<Arc<RwLock<Chunk>>>,
     chunk_indices: Arc<RwLock<[Option<usize>; CHUNKS_ARRAY_SIZE]>>,
     free_chunk_indices: Arc<RwLock<VecDeque<usize>>>,
     updated_indices: Arc<RwLock<[bool; CHUNKS_ARRAY_SIZE]>>,
@@ -42,7 +42,7 @@ impl Terrain {
         let global_layouts = GlobalsLayouts::new(&renderer.device);
         let atlas = Atlas::new(&renderer.device, &renderer.queue, &global_layouts).unwrap();
         let mut chunk_models = vec![];
-        let mut chunks:ChunkArray = ChunkArray::default();
+        let mut chunks:Vec<Arc<RwLock<Chunk>>> = Vec::default();
         let chunk_indices: [Option<usize>; CHUNKS_ARRAY_SIZE] = [None; CHUNKS_ARRAY_SIZE];
         let updated_indices = Arc::new(RwLock::new([false; CHUNKS_ARRAY_SIZE]));
         let mut free_chunk_indices = VecDeque::new();
@@ -50,9 +50,10 @@ impl Terrain {
 
         for x in 0..CHUNKS_ARRAY_SIZE {
             //println!("initial x from new terrain: {:?}", x);
-            chunks.new_chunk([0,0,0]);
+            chunks.push(Arc::new(RwLock::new(Chunk::new([0, 0, 0]))));
+            let mesh = Mesh::new(); //empty mesh
             let mut chunk_model = DynamicModel::new(&renderer.device, (CHUNK_AREA ^ 2) * CHUNK_Y_SIZE * 24);
-            chunk_model.update(&renderer.queue, &chunks.mesh_array[x].read().unwrap(), 0);
+            chunk_model.update(&renderer.queue, &mesh, 0);
             chunk_models.push(chunk_model);
             free_chunk_indices.push_back(x);
 
@@ -114,10 +115,10 @@ impl Terrain {
                         panic!("Error: Cannot load chunk")
                     }
                     
-                    *self.chunks.offset_array[new_index].write().unwrap() = chunk_offset.into();
+                    self.chunks[new_index].write().unwrap().offset = chunk_offset.into();
                     
                     generate_chunk(
-                        &mut self.chunks.blocks_array[new_index].write().unwrap(),
+                        &mut self.chunks[new_index].write().unwrap().blocks,
                         chunk_offset.into(),
                         892984781,
                         &PRAIRIE_PARAMS
@@ -126,8 +127,9 @@ impl Terrain {
                     self.chunk_indices.write().unwrap()[i] = Some(new_index);
 
 
-                    let mesh = self.update_mesh(&self.chunks.blocks_array[new_index].read().unwrap());
-                    *self.chunks.mesh_array[new_index].write().unwrap() = mesh;
+
+                    let mesh = self.update_mesh(&self.chunks[new_index].read().unwrap().blocks);
+                    self.chunks[new_index].write().unwrap().mesh = mesh;
 
                     // Mark this index as updated
                     self.updated_indices.write().unwrap()[new_index] = true;
@@ -143,7 +145,7 @@ impl Terrain {
         (0..CHUNKS_ARRAY_SIZE).for_each(|i| {
 
             if self.updated_indices.read().unwrap()[i] {
-                self.chunk_models[i].update(queue, &self.chunks.mesh_array[i].read().unwrap(), 0);
+                self.chunk_models[i].update(queue, &self.chunks[i].read().unwrap().mesh, 0);
                 self.updated_indices.write().unwrap()[i] = false;
                 println!("selected to update")
             }
@@ -202,7 +204,7 @@ impl Terrain {
     fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks) -> bool {
 
         //println!("block neighbor pos: {:?}", neighbor_pos);
-        if ChunkArray::pos_in_chunk_bounds(*neighbor_pos) {
+        if pos_in_chunk_bounds(*neighbor_pos) {
             let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].lock().unwrap();
             return neighbor_block.material_type as u16 == MaterialType::AIR as u16;
         } else { //if not in bounds, it means that the neighbor block belongs to a different chunk
@@ -269,7 +271,8 @@ impl Terrain {
         for i in 0..CHUNKS_ARRAY_SIZE {
             match chunk_indices_copy[i] {
                 Some(chunk_index) => {
-                    let chunk_offset = self.chunks.offset_array.get(chunk_index).unwrap().read().unwrap().clone();
+                    //let chunk_offset = self.chunks.offset_array.get(chunk_index).unwrap().read().unwrap().clone();
+                    let chunk_offset = self.chunks.get(chunk_index).unwrap().read().unwrap().offset.clone();
                     if self.chunk_in_bounds(chunk_offset.into()) {
                         let new_chunk_world_index = self.get_chunk_world_index(chunk_offset.into());
                         self.chunk_indices.write().unwrap()[new_chunk_world_index] = Some(chunk_index);

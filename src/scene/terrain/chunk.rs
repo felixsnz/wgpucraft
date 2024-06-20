@@ -19,63 +19,62 @@ pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
 pub type Blocks = Vec<Vec<Vec<Arc<Mutex<Block>>>>>;
 
 
-
-
-fn init_blocks(offset: [i32; 3]) -> Blocks {
-
-
-    let mut blocks = vec![
-        vec![
-            vec![
-                Arc::new(
-                    Mutex::new(
-                        Block::new(
-                            MaterialType::DEBUG,
-                            [0, 0, 0],
-                            offset
-                        )
-                    )
-                )
-                ; CHUNK_AREA
-            ]; CHUNK_AREA
-        ]; CHUNK_Y_SIZE
-    ];
-   
-    // Assuming CHUNK_Y_SIZE is a usize or similar that represents the height.
-    for y in 0..CHUNK_Y_SIZE{
-        for z in 0..CHUNK_AREA {
-            for x in 0..CHUNK_AREA {
-                let position = cgmath::Vector3 { x: x as i32, y: y as i32, z: z as i32 };
-                let material_type =
-                if y < LAND_LEVEL {
-                    MaterialType::DEBUG
-                }
-                else if y == LAND_LEVEL{
-                    MaterialType::DEBUG
-                }
-                else {
-                    MaterialType::AIR
-                };
-
-
-                blocks[y][x][z] = Arc::new(Mutex::new(Block::new(material_type, position.into(), offset)));
-            }
-        }
-    }
-
-
-    blocks
-
-
+#[derive(Default)]
+pub struct Chunk {
+    pub blocks: Blocks,
+    pub offset: [i32; 3],
+    pub updated: bool,
+    pub mesh: Mesh<BlockVertex>,
+    pub neighbors: [Option<Arc<RwLock<Chunk>>>; 6]
 }
 
 
-// #[derive(Default)]
-// pub struct Chunk {
-//     pub blocks: Blocks,
-//     pub offset: [i32; 3],
-//     pub updated: bool
-// }
+
+
+impl Chunk {
+    pub fn new(offset: [i32; 3]) -> Self {
+
+        let mut blocks = vec![
+            vec![
+                vec![
+                    Arc::new(
+                        Mutex::new(
+                            Block::new(
+                                MaterialType::DEBUG,
+                                [0, 0, 0],
+                                offset
+                            )
+                        )
+                    )
+                    ; CHUNK_AREA
+                ]; CHUNK_AREA
+            ]; CHUNK_Y_SIZE
+        ];
+        
+        // Assuming CHUNK_Y_SIZE is a usize or similar that represents the height.
+        for y in 0..CHUNK_Y_SIZE{
+            for z in 0..CHUNK_AREA {
+                for x in 0..CHUNK_AREA {
+                    let position = cgmath::Vector3 { x: x as i32, y: y as i32, z: z as i32 };
+                    let material_type =
+                    if y < LAND_LEVEL {
+                        MaterialType::DEBUG
+                    }
+                    else if y == LAND_LEVEL{
+                        MaterialType::DEBUG
+                    }
+                    else {
+                        MaterialType::AIR
+                    };
+
+                    blocks[y][x][z] = Arc::new(Mutex::new(Block::new(material_type, position.into(), offset)));
+                }
+            }
+        }
+        Self { updated: true, blocks, offset, neighbors: Default::default(), mesh: Default::default()}
+    }
+}
+
 
 
 pub fn local_pos_to_world(offset:[i32;3], local_pos: Vector3<i32>) -> Vector3<f32> {
@@ -87,61 +86,31 @@ pub fn local_pos_to_world(offset:[i32;3], local_pos: Vector3<i32>) -> Vector3<f3
 }
 
 
-#[derive(Default)]
-pub struct ChunkArray {
-    pub mesh_array: Vec<Arc<RwLock<Mesh<BlockVertex>>>>,
-    pub offset_array: Vec<Arc<RwLock<[i32; 3]>>>,
-    pub blocks_array: Vec<Arc<RwLock<Blocks>>>,
-}
-
-
-
-
-
-
-impl ChunkArray {
-
-
-    pub fn new_chunk(&mut self, offset: [i32; 3]) -> &Self {
-        let blocks = init_blocks(offset);
-        self.mesh_array.push(Arc::new(RwLock::new(Mesh::new())));
-        self.blocks_array.push(Arc::new(RwLock::new(blocks)));
-        self.offset_array.push(Arc::new(RwLock::new(offset)));
-        return self;
-    }
-
-
-
-
-
-
-
-
-    pub fn pos_in_chunk_bounds(pos: Vector3<i32>) -> bool {
-        if pos.x >= 0 && pos.y >= 0 && pos.z >= 0 {
-            if pos.x < CHUNK_AREA as i32 && pos.y < CHUNK_Y_SIZE as i32 && pos.z < CHUNK_AREA as i32 {
-                return true;
-            }
+pub fn pos_in_chunk_bounds(pos: Vector3<i32>) -> bool {
+    if pos.x >= 0 && pos.y >= 0 && pos.z >= 0 {
+        if pos.x < CHUNK_AREA as i32 && pos.y < CHUNK_Y_SIZE as i32 && pos.z < CHUNK_AREA as i32 {
+            return true;
         }
-        return false;
     }
-
-
-   
+    return false;
 }
+
+
 
 
 pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &BiomeParameters) {
-    let noise_generator = NoiseGenerator::new(seed);
+    //let noise_generator = NoiseGenerator::new(seed);
 
     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {
         let z = i / (CHUNK_AREA * CHUNK_Y_SIZE);
         let y = (i - z * CHUNK_AREA * CHUNK_Y_SIZE) / CHUNK_AREA;
         let x = i % CHUNK_AREA;
-        let world_pos = local_pos_to_world(offset, Vector3::new(x as i32, y as i32, z as i32));
+        // let world_pos = local_pos_to_world(offset, Vector3::new(x as i32, y as i32, z as i32));
 
-        let height_variation = noise_generator.get_height(world_pos.x as f32, world_pos.z as f32, biome.frequency, biome.amplitude);
-        let new_height = (biome.base_height + height_variation).round() as usize;
+        // let height_variation = noise_generator.get_height(world_pos.x as f32, world_pos.z as f32, biome.frequency, biome.amplitude);
+         // let new_height = (biome.base_height + height_variation).round() as usize;
+
+         let new_height = y;
 
         let block_type = if y > new_height {
             if y <= LAND_LEVEL {

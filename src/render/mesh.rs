@@ -1,11 +1,11 @@
 
-use crate::scene::terrain::chunk::{Blocks, ChunkArray, CHUNK_AREA, CHUNK_Y_SIZE};
+use crate::scene::terrain::chunk::{Blocks, pos_in_chunk_bounds, CHUNK_AREA, CHUNK_Y_SIZE};
 
 
 use super::{atlas::MaterialType, pipelines::terrain::BlockVertex, Vertex};
 
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 
 
 /// Represents a vec-based mesh on the CPU
@@ -91,7 +91,7 @@ impl<V: Vertex> Mesh<V>
                         let neighbor_pos = block.get_vec_position() + quad.side.to_vec();
 
 
-                        if ChunkArray::pos_in_chunk_bounds(neighbor_pos) {
+                        if pos_in_chunk_bounds(neighbor_pos) {
                             let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].lock().unwrap();
                             if neighbor_block.material_type as u16 == MaterialType::AIR as u16 {
                                 visible = true;
