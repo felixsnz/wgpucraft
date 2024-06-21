@@ -29,7 +29,7 @@ impl<V: Vertex> Mesh<V>
 
         let mut mesh = Self::new();
         // Example condition: return None if the chunk has no blocks
-        if blocks.iter().flat_map(|y| y.iter()).flat_map(|x| x.iter()).all(|b| b.lock().unwrap().material_type == MaterialType::AIR) {
+        if blocks.iter().flat_map(|y| y.iter()).flat_map(|x| x.iter()).all(|b| b.read().unwrap().material_type == MaterialType::AIR) {
             None
         } else {
             mesh.push_chunk(blocks);
@@ -75,7 +75,7 @@ impl<V: Vertex> Mesh<V>
                 for x in 0..CHUNK_AREA {
 
 
-                    let block = blocks[y][x][z].lock().unwrap();
+                    let block = blocks[y][x][z].read().unwrap();
                     let mut block_vertices = Vec::with_capacity(4 * 6);
                     let mut block_indices: Vec<u16> = Vec::with_capacity(6 * 6);
 
@@ -92,7 +92,7 @@ impl<V: Vertex> Mesh<V>
 
 
                         if pos_in_chunk_bounds(neighbor_pos) {
-                            let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].lock().unwrap();
+                            let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].read().unwrap();
                             if neighbor_block.material_type as u16 == MaterialType::AIR as u16 {
                                 visible = true;
                             }

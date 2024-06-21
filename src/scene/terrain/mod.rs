@@ -10,6 +10,7 @@ use self::chunk::{generate_chunk, Blocks, CHUNK_AREA, CHUNK_Y_SIZE, Chunk, pos_i
 
 
 use biomes::{MOUNTAIN_PARAMS, PRAIRIE_PARAMS};
+use block::Block;
 use cgmath::{EuclideanSpace, Point3, Vector3};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::Queue;
@@ -60,6 +61,8 @@ impl Terrain {
 
         }
 
+        
+
 
         let shader = renderer.device.create_shader_module(
             wgpu::include_wgsl!("../../../assets/shaders/shader.wgsl")
@@ -90,12 +93,35 @@ impl Terrain {
             free_chunk_indices: Arc::new(RwLock::new(free_chunk_indices))
         };
 
+        // Establecer referencias a los vecinos
+        for i in 0..CHUNKS_ARRAY_SIZE {
+            let chunk_offset = terrain.get_chunk_offset(i);
+            let neighbors = [
+                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(1, 0, 0)),  // vecino en +X
+                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(-1, 0, 0)), // vecino en -X
+                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 1, 0)),  // vecino en +Y
+                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, -1, 0)), // vecino en -Y
+                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 0, 1)),  // vecino en +Z
+                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 0, -1))  // vecino en -Z
+            ];
+            terrain.chunks[i].write().unwrap().neighbors = neighbors;
+        }
+
 
         println!("about to load first chunks");
         terrain.load_empty_chunks(&renderer.queue);
 
 
         terrain
+    }
+
+    fn get_chunk_at_offset(&self, offset: Vector3<i32>) -> Option<Arc<RwLock<Chunk>>> {
+        if self.chunk_in_bounds(offset) {
+            let index = self.get_chunk_world_index(offset);
+            self.chunk_indices.read().unwrap()[index].map(|i| self.chunks[i].clone())
+        } else {
+            None
+        }
     }
 
 
@@ -128,7 +154,7 @@ impl Terrain {
 
 
 
-                    let mesh = self.update_mesh(&self.chunks[new_index].read().unwrap().blocks);
+                    let mesh = self.update_mesh(&self.chunks[new_index].read().unwrap().blocks, &self.chunks[new_index].read().unwrap().offset);
                     self.chunks[new_index].write().unwrap().mesh = mesh;
 
                     // Mark this index as updated
@@ -147,7 +173,7 @@ impl Terrain {
             if self.updated_indices.read().unwrap()[i] {
                 self.chunk_models[i].update(queue, &self.chunks[i].read().unwrap().mesh, 0);
                 self.updated_indices.write().unwrap()[i] = false;
-                println!("selected to update")
+                //println!("selected to update")
             }
 
         });
@@ -158,7 +184,7 @@ impl Terrain {
 
 
 
-    pub fn update_mesh(&self, blocks: &Blocks) -> Mesh<BlockVertex> {
+    pub fn update_mesh(&self, blocks: &Blocks, offset: &[i32; 3]) -> Mesh<BlockVertex> {
 
 
         let mut verts =Vec::new();
@@ -166,7 +192,7 @@ impl Terrain {
         for y in 0.. CHUNK_Y_SIZE{
             for z in 0..CHUNK_AREA {
                 for x in 0..CHUNK_AREA {
-                    let block = blocks[y][x][z].lock().unwrap().clone();
+                    let block = blocks[y][x][z].read().unwrap().clone();
                     let mut block_vertices = Vec::with_capacity(4 * 6);
                     let mut block_indices: Vec<u16> = Vec::with_capacity(6 * 6);
                     if block.material_type as i32 == MaterialType::AIR as i32 {
@@ -179,10 +205,10 @@ impl Terrain {
 
                     for quad in block.quads.iter() {
                         let neighbor_pos: Vector3<i32> = block.get_vec_position() + quad.side.to_vec();
-                        let visible = self.determine_visibility(&neighbor_pos, blocks);
+                        let neighbor_exists = self.neighbor_exists(&neighbor_pos, blocks, offset);
 
 
-                        if visible {
+                        if !neighbor_exists { //if neigbor does not exists, the current face is visible
                             block_vertices.extend_from_slice(&quad.vertices);
                             block_indices.extend_from_slice(&quad.get_indices(quad_counter));
                             quad_counter += 1;
@@ -200,25 +226,45 @@ impl Terrain {
     }
 
 
-    /// Helper function to check visibility of a block
-    fn determine_visibility(&self, neighbor_pos: &Vector3<i32>,blocks: &Blocks) -> bool {
-
-        //println!("block neighbor pos: {:?}", neighbor_pos);
+    fn neighbor_exists(&self, neighbor_pos: &Vector3<i32>, blocks: &Blocks, chunk_offset: &[i32; 3]) -> bool {
         if pos_in_chunk_bounds(*neighbor_pos) {
-            let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].lock().unwrap();
-            return neighbor_block.material_type as u16 == MaterialType::AIR as u16;
-        } else { //if not in bounds, it means that the neighbor block belongs to a different chunk
-
-
-            return  true;
+            let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].read().unwrap();
+            return !(neighbor_block.material_type as u16 == MaterialType::AIR as u16);
+        } else {
+            let neighbor_chunk_offset = self.calculate_neighbor_chunk_offset(*chunk_offset, *neighbor_pos);
+            //println!("{:?}",neighbor_chunk_offset);
+            if let Some(neighbor_chunk) = self.get_chunk_at_offset(neighbor_chunk_offset) {
+                
+                let neighbor_chunk = neighbor_chunk.read().unwrap();
+                
+                let local_pos = self.calculate_local_position_in_chunk(*neighbor_pos);
+                println!("debug {:?}", local_pos);
+                // let neighbor_block = neighbor_chunk.blocks[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].read().unwrap();
+                // println!("exito shiabos {:?}", neighbor_block.position);
+            }
+            //     
+            //     let neighbor_block = neighbor_chunk.blocks[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
+            //     return !(neighbor_block.material_type as u16 == MaterialType::AIR as u16);
+            // }
+            return false;
         }
     }
 
+    fn calculate_neighbor_chunk_offset(&self, chunk_offset: [i32; 3], neighbor_pos: Vector3<i32>) -> Vector3<i32> {
+        Vector3::new(
+            chunk_offset[0] + (neighbor_pos.x / CHUNK_AREA as i32),
+            chunk_offset[1] + (neighbor_pos.y / CHUNK_Y_SIZE as i32),
+            chunk_offset[2] + (neighbor_pos.z / CHUNK_AREA as i32),
+        )
+    }
 
-
-
-
-
+    fn calculate_local_position_in_chunk(&self, neighbor_pos: Vector3<i32>) -> Vector3<i32> {
+        Vector3::new(
+            neighbor_pos.x % CHUNK_AREA as i32,
+            neighbor_pos.y % CHUNK_Y_SIZE as i32,
+            neighbor_pos.z % CHUNK_AREA as i32,
+        )
+    }
 
 
     // world array index -> chunk offset

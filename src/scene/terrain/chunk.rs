@@ -16,7 +16,7 @@ pub const CHUNK_AREA:usize =16;
 pub const TOTAL_CHUNK_SIZE: usize = CHUNK_Y_SIZE * CHUNK_AREA * CHUNK_AREA;
 
 
-pub type Blocks = Vec<Vec<Vec<Arc<Mutex<Block>>>>>;
+pub type Blocks = Vec<Vec<Vec<Arc<RwLock<Block>>>>>;
 
 
 #[derive(Default)]
@@ -38,7 +38,7 @@ impl Chunk {
             vec![
                 vec![
                     Arc::new(
-                        Mutex::new(
+                        RwLock::new(
                             Block::new(
                                 MaterialType::DEBUG,
                                 [0, 0, 0],
@@ -67,7 +67,7 @@ impl Chunk {
                         MaterialType::AIR
                     };
 
-                    blocks[y][x][z] = Arc::new(Mutex::new(Block::new(material_type, position.into(), offset)));
+                    blocks[y][x][z] = Arc::new(RwLock::new(Block::new(material_type, position.into(), offset)));
                 }
             }
         }
@@ -99,18 +99,18 @@ pub fn pos_in_chunk_bounds(pos: Vector3<i32>) -> bool {
 
 
 pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &BiomeParameters) {
-    //let noise_generator = NoiseGenerator::new(seed);
+    let noise_generator = NoiseGenerator::new(seed);
 
     (0..TOTAL_CHUNK_SIZE).into_par_iter().for_each(|i| {
         let z = i / (CHUNK_AREA * CHUNK_Y_SIZE);
         let y = (i - z * CHUNK_AREA * CHUNK_Y_SIZE) / CHUNK_AREA;
         let x = i % CHUNK_AREA;
-        // let world_pos = local_pos_to_world(offset, Vector3::new(x as i32, y as i32, z as i32));
+        let world_pos = local_pos_to_world(offset, Vector3::new(x as i32, y as i32, z as i32));
 
-        // let height_variation = noise_generator.get_height(world_pos.x as f32, world_pos.z as f32, biome.frequency, biome.amplitude);
-         // let new_height = (biome.base_height + height_variation).round() as usize;
+        let height_variation = noise_generator.get_height(world_pos.x as f32, world_pos.z as f32, biome.frequency, biome.amplitude);
+        let new_height = (biome.base_height + height_variation).round() as usize;
 
-         let new_height = y;
+        //let new_height = y;
 
         let block_type = if y > new_height {
             if y <= LAND_LEVEL {
@@ -126,6 +126,6 @@ pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &
             MaterialType::DIRT
         };
 
-        blocks[y][x][z].lock().unwrap().update(block_type, offset);
+        blocks[y][x][z].write().unwrap().update(block_type, offset);
     });
 }
