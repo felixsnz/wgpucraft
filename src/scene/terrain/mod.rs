@@ -2,7 +2,7 @@ pub mod block;
 pub mod chunk;
 pub mod noise;
 pub mod biomes;
-use std::{collections::VecDeque, sync::{Arc, RwLock}};
+use std::{collections::VecDeque, sync::{Arc, Barrier, RwLock}};
 
 use crate::render::{atlas::{Atlas, MaterialType}, mesh::Mesh, model::DynamicModel, pipelines::terrain::{BlockVertex, TerrainPipeline}, renderer::{Draw, Renderer}};
 use crate::render::pipelines::GlobalsLayouts;
@@ -12,12 +12,13 @@ use self::chunk::{generate_chunk, Blocks, CHUNK_AREA, CHUNK_Y_SIZE, Chunk, pos_i
 use biomes::{MOUNTAIN_PARAMS, PRAIRIE_PARAMS};
 use block::Block;
 use cgmath::{EuclideanSpace, Point3, Vector3};
+use chunk::local_pos_to_world;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use wgpu::Queue;
 
 
 pub const LAND_LEVEL: usize = 9;
-pub const CHUNKS_VIEW_SIZE: usize = 12;
+pub const CHUNKS_VIEW_SIZE: usize = 2;
 pub const CHUNKS_ARRAY_SIZE: usize = CHUNKS_VIEW_SIZE * CHUNKS_VIEW_SIZE;
 
 
@@ -94,18 +95,18 @@ impl Terrain {
         };
 
         // Establecer referencias a los vecinos
-        for i in 0..CHUNKS_ARRAY_SIZE {
-            let chunk_offset = terrain.get_chunk_offset(i);
-            let neighbors = [
-                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(1, 0, 0)),  // vecino en +X
-                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(-1, 0, 0)), // vecino en -X
-                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 1, 0)),  // vecino en +Y
-                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, -1, 0)), // vecino en -Y
-                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 0, 1)),  // vecino en +Z
-                terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 0, -1))  // vecino en -Z
-            ];
-            terrain.chunks[i].write().unwrap().neighbors = neighbors;
-        }
+        // for i in 0..CHUNKS_ARRAY_SIZE {
+        //     let chunk_offset = terrain.get_chunk_offset(i);
+        //     let neighbors = [
+        //         terrain.get_chunk_at_offset(chunk_offset + Vector3::new(1, 0, 0)),  // vecino en +X
+        //         terrain.get_chunk_at_offset(chunk_offset + Vector3::new(-1, 0, 0)), // vecino en -X
+        //         terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 1, 0)),  // vecino en +Y
+        //         terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, -1, 0)), // vecino en -Y
+        //         terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 0, 1)),  // vecino en +Z
+        //         terrain.get_chunk_at_offset(chunk_offset + Vector3::new(0, 0, -1))  // vecino en -Z
+        //     ];
+        //     terrain.chunks[i].write().unwrap().neighbors = neighbors;
+        // }
 
 
         println!("about to load first chunks");
@@ -129,31 +130,50 @@ impl Terrain {
 
     pub fn load_empty_chunks(&mut self, queue: &Queue) {
 
-        (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| {
+        let chunks_to_update: usize = (0..CHUNKS_ARRAY_SIZE)
+            .filter(|&i| self.chunk_indices.read().unwrap()[i].is_none())
+            .count();
+
+        let barrier = Arc::new(Barrier::new(chunks_to_update));
+
+        println!("chunks array size: {:?}", CHUNKS_ARRAY_SIZE);
+
+        (0..CHUNKS_ARRAY_SIZE).into_par_iter().for_each(|i| { 
+            let c = Arc::clone(&barrier); // Clonar la referencia a la barrera para cada hilo
+
+            
 
 
             let chunk_index = self.chunk_indices.read().unwrap()[i].clone();
+
+            
+
+            
             if let None = chunk_index {
+
+                
                 let new_index = self.free_chunk_indices.write().unwrap().pop_front();
+                
                 if let Some(new_index) = new_index {
                     let chunk_offset = self.get_chunk_offset(i);
                     if !self.chunk_in_bounds(chunk_offset) {
                         panic!("Error: Cannot load chunk")
                     }
                     
+
+
                     self.chunks[new_index].write().unwrap().offset = chunk_offset.into();
-                    
                     generate_chunk(
                         &mut self.chunks[new_index].write().unwrap().blocks,
                         chunk_offset.into(),
                         892984781,
                         &PRAIRIE_PARAMS
                     );
-
+                    println!("barrera alcaza");
+                    
                     self.chunk_indices.write().unwrap()[i] = Some(new_index);
 
-
-
+                    c.wait();
                     let mesh = self.update_mesh(&self.chunks[new_index].read().unwrap().blocks, &self.chunks[new_index].read().unwrap().offset);
                     self.chunks[new_index].write().unwrap().mesh = mesh;
 
@@ -231,39 +251,38 @@ impl Terrain {
             let neighbor_block = blocks[neighbor_pos.y as usize][neighbor_pos.x as usize][neighbor_pos.z as usize].read().unwrap();
             return !(neighbor_block.material_type as u16 == MaterialType::AIR as u16);
         } else {
-            let neighbor_chunk_offset = self.calculate_neighbor_chunk_offset(*chunk_offset, *neighbor_pos);
-            //println!("{:?}",neighbor_chunk_offset);
-            if let Some(neighbor_chunk) = self.get_chunk_at_offset(neighbor_chunk_offset) {
-                
-                let neighbor_chunk = neighbor_chunk.read().unwrap();
-                
-                let local_pos = self.calculate_local_position_in_chunk(*neighbor_pos);
-                println!("debug {:?}", local_pos);
-                // let neighbor_block = neighbor_chunk.blocks[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].read().unwrap();
-                // println!("exito shiabos {:?}", neighbor_block.position);
+
+            if neighbor_pos.y < 0 || neighbor_pos.y >= CHUNK_Y_SIZE as i32 {
+                return false;
             }
-            //     
-            //     let neighbor_block = neighbor_chunk.blocks[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].lock().unwrap();
-            //     return !(neighbor_block.material_type as u16 == MaterialType::AIR as u16);
-            // }
+            let world_pos = local_pos_to_world(chunk_offset, neighbor_pos);
+            let neighbor_chunk_offset = Self::world_pos_to_chunk_offset(world_pos);
+            
+            if let Some(neighbor_chunk) = self.get_chunk_at_offset(neighbor_chunk_offset) {
+                let neighbor_chunk = neighbor_chunk.read().unwrap();
+                let local_pos = Vector3::new(
+                    world_pos.x as i32 - (neighbor_chunk_offset[0] * CHUNK_AREA as i32),
+                    world_pos.y as i32- (neighbor_chunk_offset[1] * CHUNK_Y_SIZE as i32),
+                    world_pos.z as i32- (neighbor_chunk_offset[2] * CHUNK_AREA as i32),
+                );
+
+                if pos_in_chunk_bounds(local_pos) {
+                    let neighbor_block = neighbor_chunk.blocks[local_pos.y as usize][local_pos.x as usize][local_pos.z as usize].read().unwrap();
+                    return !(neighbor_block.material_type as u16 == MaterialType::AIR as u16);
+                }
+                else {
+                    //println!("{:?}",neighbor_chunk_offset);
+                    println!("debug {:?}", local_pos);
+                    println!("error esto no deberia ??");
+                    return false;
+                }
+                
+            }
+            else {
+                println!("no encontro chunk")
+            }
             return false;
         }
-    }
-
-    fn calculate_neighbor_chunk_offset(&self, chunk_offset: [i32; 3], neighbor_pos: Vector3<i32>) -> Vector3<i32> {
-        Vector3::new(
-            chunk_offset[0] + (neighbor_pos.x / CHUNK_AREA as i32),
-            chunk_offset[1] + (neighbor_pos.y / CHUNK_Y_SIZE as i32),
-            chunk_offset[2] + (neighbor_pos.z / CHUNK_AREA as i32),
-        )
-    }
-
-    fn calculate_local_position_in_chunk(&self, neighbor_pos: Vector3<i32>) -> Vector3<i32> {
-        Vector3::new(
-            neighbor_pos.x % CHUNK_AREA as i32,
-            neighbor_pos.y % CHUNK_Y_SIZE as i32,
-            neighbor_pos.z % CHUNK_AREA as i32,
-        )
     }
 
 
@@ -294,8 +313,6 @@ impl Terrain {
         let p = chunk_offset - self.chunks_origin;
         (p.z as usize * CHUNKS_VIEW_SIZE) + p.x as usize
     }
-
-
 
 
     //called every frame

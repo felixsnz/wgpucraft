@@ -25,7 +25,7 @@ pub struct Chunk {
     pub offset: [i32; 3],
     pub updated: bool,
     pub mesh: Mesh<BlockVertex>,
-    pub neighbors: [Option<Arc<RwLock<Chunk>>>; 6]
+    //pub neighbors: [Option<Arc<RwLock<Chunk>>>; 6]
 }
 
 
@@ -71,13 +71,13 @@ impl Chunk {
                 }
             }
         }
-        Self { updated: true, blocks, offset, neighbors: Default::default(), mesh: Default::default()}
+        Self { updated: true, blocks, offset, /* neighbors: Default::default(),*/ mesh: Default::default()}
     }
 }
 
 
 
-pub fn local_pos_to_world(offset:[i32;3], local_pos: Vector3<i32>) -> Vector3<f32> {
+pub fn local_pos_to_world(offset: &[i32;3], local_pos: &Vector3<i32>) -> Vector3<f32> {
     Vector3::new(
         local_pos.x as f32 + (offset[0] as f32 * CHUNK_AREA as f32),
         local_pos.y as f32 + (offset[1] as f32 * CHUNK_AREA as f32),
@@ -98,6 +98,7 @@ pub fn pos_in_chunk_bounds(pos: Vector3<i32>) -> bool {
 
 
 
+
 pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &BiomeParameters) {
     let noise_generator = NoiseGenerator::new(seed);
 
@@ -105,7 +106,7 @@ pub fn generate_chunk(blocks: &mut Blocks, offset: [i32; 3], seed: u32, biome: &
         let z = i / (CHUNK_AREA * CHUNK_Y_SIZE);
         let y = (i - z * CHUNK_AREA * CHUNK_Y_SIZE) / CHUNK_AREA;
         let x = i % CHUNK_AREA;
-        let world_pos = local_pos_to_world(offset, Vector3::new(x as i32, y as i32, z as i32));
+        let world_pos = local_pos_to_world(&offset, &Vector3::new(x as i32, y as i32, z as i32));
 
         let height_variation = noise_generator.get_height(world_pos.x as f32, world_pos.z as f32, biome.frequency, biome.amplitude);
         let new_height = (biome.base_height + height_variation).round() as usize;
