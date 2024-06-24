@@ -17,7 +17,7 @@ https://github.com/jdah/minecraft-weekend
 Because i'm too cool for that, i like to struggle, and that keeps my mind busy, so i decided that a making game from scratch using a pure graphics library would be a great pain to experience.
 
 ## Screenshots
-![Gameplay](./screenshots/1.png)
+![Gameplay](./screenshots/2.png)
 
 
 
